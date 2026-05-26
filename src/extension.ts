@@ -3,6 +3,7 @@
 import * as vscode from "vscode";
 import COMMANDS from "./constants/commands";
 import wrapInTryCatch from "./commands/wrap-in-try-catch";
+import generateBoilerplate from "./commands/generate-boilerplate";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -13,7 +14,10 @@ export function activate(context: vscode.ExtensionContext) {
 	const { registerCommand } = vscode.commands;
 	console.log("welcome to patterngen!");
 
-	context.subscriptions.push(registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)));
+	context.subscriptions.push(
+		registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)),
+		registerCommand(COMMANDS.generateBoilerPlate.id, () => generateBoilerplate(context)),
+	);
 }
 
 // This method is called when your extension is deactivated

@@ -1,10 +1,10 @@
 const COMMANDS = {
-  helloWorld: {
-    id: 'patterngen.helloWorld',
-  },
-  tryCatch: {
-    id: 'patterngen.tryCatch',
-  },
+	tryCatch: {
+		id: "patterngen.tryCatch",
+	},
+	generateBoilerPlate: {
+		id: "patterngen.generateBoilerplate",
+	},
 } as const;
 
 export default COMMANDS;

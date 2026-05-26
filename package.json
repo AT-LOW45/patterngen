@@ -20,6 +20,10 @@
 			{
 				"command": "patterngen.tryCatch",
 				"title": "Wrap Selection in try/catch"
+			},
+			{
+				"command": "patterngen.generateBoilerplate",
+				"title": "Generate Boilerplate"
 			}
 		]
 	},
