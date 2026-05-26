@@ -7,16 +7,16 @@
 		"vscode": "^1.120.0"
 	},
 	"categories": [
-		"Other"
+		"AI",
+		"Programming Languages",
+		"Snippets"
 	],
-	"activationEvents": ["onStartupFinished"],
+	"activationEvents": [
+		"onStartupFinished"
+	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
-			{
-				"command": "patterngen.helloWorld",
-				"title": "Hello World"
-			},
 			{
 				"command": "patterngen.tryCatch",
 				"title": "Wrap Selection in try/catch"
