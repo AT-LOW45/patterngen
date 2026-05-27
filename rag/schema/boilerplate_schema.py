@@ -1,4 +1,6 @@
 from pydantic import BaseModel
 
+
 class GenerateBoilerplateRequest(BaseModel):
-	query: str
+    query: str
+    language: str
