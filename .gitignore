@@ -7,3 +7,4 @@ node_modules
 
 .venv/
 uv.lock
+.vscode/settings.json

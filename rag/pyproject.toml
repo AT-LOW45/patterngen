@@ -19,4 +19,3 @@ package = false
 
 [tool.pyright]
 pythonVersion = "3.13"
-extraPaths = ["."]

@@ -2,7 +2,6 @@ from config.llm_config import groq_llm
 from schema.boilerplate_schema import GenerateBoilerplateRequest
 from langchain_core.prompts import ChatPromptTemplate
 
-
 async def run_generate_boilerplate(request: GenerateBoilerplateRequest):
     context = "no context now, just do as you see fit"
 
