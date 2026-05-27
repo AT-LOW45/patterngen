@@ -24,11 +24,17 @@ def strip_code_fences(text: str) -> str:
 
 
 async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
+    selection_note = (
+        f"Use this existing code as context:\n{request.selection_context}"
+        if request.selection_context
+        else ""
+    )
+
     template = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                "You are a code generator for {language}. Generate code that strictly follows these company coding standards:\n\n{context}\n\nReturn only the code, no explanations, no markdown code fences.",
+                f"You are a code generator for {{language}}. Generate code that strictly follows these company coding standards:\n\n{{context}}\n\n{selection_note}\n\nReturn only the code, no explanations, no markdown code fences.",
             ),
             ("human", "{prompt}"),
         ]
@@ -36,6 +42,11 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
 
     chain = template | groq_llm
     response = await chain.ainvoke(
-        {"context": MOCK_CONTEXT, "prompt": request.query, "language": request.language}
+        {
+            "context": MOCK_CONTEXT,
+            "prompt": request.query,
+            "language": request.language,
+            "selection_context": request.selection_context,
+        }
     )
     return strip_code_fences(str(response.content))

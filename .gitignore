@@ -8,3 +8,6 @@ node_modules
 .venv/
 uv.lock
 .vscode/settings.json
+
+__pycache__/
+*.pyc

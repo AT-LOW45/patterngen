@@ -28,7 +28,8 @@ export default async function generateBoilerplate(context: vscode.ExtensionConte
 			},
 			async () => {
 				const language = editor.document.languageId;
-				const response = await boilerplateService.generateBoilerplate(input, language);
+				const selectedText = editor.document.getText(editor.selection);
+				const response = await boilerplateService.generateBoilerplate(input, language, selectedText);
 				return response.data.code;
 			},
 		);
