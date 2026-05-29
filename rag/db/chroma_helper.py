@@ -35,8 +35,8 @@ def add_documents(documents: list[Document], source: str) -> IndexingResult:
     return result
 
 
-def search(query: str, k: int = 3) -> str:
-    results = vector_store.similarity_search(query, k=k)
+async def chroma_search(query: str, k: int = 3) -> str:
+    results = await vector_store.asimilarity_search(query, k=k)
     return "\n\n".join([doc.page_content for doc in results])
 
 

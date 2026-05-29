@@ -1,17 +1,18 @@
 from config.llm_config import groq_llm
+from db.chroma_helper import chroma_search
 from schema.boilerplate_schema import GenerateBoilerplateRequest
 from langchain_core.prompts import ChatPromptTemplate
 
-MOCK_CONTEXT = """
-Company Coding Standards:
+# MOCK_CONTEXT = """
+# Company Coding Standards:
 
-1. All functions must have type hints
-2. Use async/await for all I/O operations
-3. Error handling must use custom exception classes, not generic Exception
-4. All API responses must follow the format: {"data": ..., "error": null} or {"data": null, "error": "message"}
-5. Variable names must be snake_case
-6. No print statements, use logging module instead
-"""
+# 1. All functions must have type hints
+# 2. Use async/await for all I/O operations
+# 3. Error handling must use custom exception classes, not generic Exception
+# 4. All API responses must follow the format: {"data": ..., "error": null} or {"data": null, "error": "message"}
+# 5. Variable names must be snake_case
+# 6. No print statements, use logging module instead
+# """
 
 
 def strip_code_fences(text: str) -> str:
@@ -34,16 +35,18 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
         [
             (
                 "system",
-                f"You are a code generator for {{language}}. Generate code that strictly follows these company coding standards:\n\n{{context}}\n\n{selection_note}\n\nReturn only the code, no explanations, no markdown code fences.",
+                f"You are a code generator for {{language}}. Generate code that strictly follows these company coding standards:\n\n{{context}}\n\n{selection_note}\n\n. If the standards include examples in multiple languages, only use the {{language}} implementation. Return only the code, no explanations, no markdown code fences.",
             ),
             ("human", "{prompt}"),
         ]
     )
 
+    context = await chroma_search(request.query)
+
     chain = template | groq_llm
     response = await chain.ainvoke(
         {
-            "context": MOCK_CONTEXT,
+            "context": context,
             "prompt": request.query,
             "language": request.language,
             "selection_context": request.selection_context,
