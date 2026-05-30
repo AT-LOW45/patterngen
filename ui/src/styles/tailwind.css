@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+:root {
+	font-size: 14px;
+	color: #4b5563;
+	background-color: #f9fafc;
+}
