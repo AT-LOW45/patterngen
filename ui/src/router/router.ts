@@ -13,6 +13,12 @@ const routes: CreateRouterRoutes = [
 		component: AppLayout,
 		children: [
 			{
+				path: ROUTES.default,
+				redirect: () => {
+					return ROUTES.knowledgeBase;
+				},
+			},
+			{
 				path: ROUTES.knowledgeBase,
 				name: "KnowledgeBase",
 				component: () => import("@/pages/KnowledgeBase.vue"),

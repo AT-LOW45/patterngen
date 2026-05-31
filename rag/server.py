@@ -1,6 +1,7 @@
 from db.chroma_helper import add_documents, delete_source
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from schema.boilerplate_schema import GenerateBoilerplateRequest
 from service.boilerplate_service import run_generate_boilerplate
 from langchain_core.documents import Document
@@ -8,6 +9,15 @@ from fastapi import UploadFile, File
 from db.chroma_helper import vector_store
 
 app = FastAPI()
+
+# Enable CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/generate-boilerplate")
