@@ -1,5 +1,7 @@
+import os
+
 from langchain_chroma.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.indexing import IndexingResult, index
@@ -9,7 +11,10 @@ CHROMA_DB_PATH = "./chroma_db"
 RECORD_MANAGER_DB = "sqlite:///./record_manager.db"
 NAMESPACE = "chroma/patterngen"
 
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+)
 
 vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embeddings)
 

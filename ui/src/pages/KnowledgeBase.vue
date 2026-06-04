@@ -53,6 +53,7 @@ const fetchRecords = async () => {
 	error.value = null;
 	try {
 		const response = await knowledgeBaseService.getAllRecords();
+		console.log(response.data)
 		records.value = response.data.sources.map((source: string) => ({
 			name: source,
 		}));
