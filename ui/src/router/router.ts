@@ -23,6 +23,11 @@ const routes: CreateRouterRoutes = [
 				name: "KnowledgeBase",
 				component: () => import("@/pages/KnowledgeBase.vue"),
 			},
+			{
+				path: ROUTES.knowledgeBaseRecord,
+				name: "KnowledgeBaseRecord",
+				component: () => import("@/pages/KnowledgeBaseRecord.vue"),
+			},
 		],
 	},
 ];

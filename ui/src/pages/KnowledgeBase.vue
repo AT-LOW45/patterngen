@@ -50,7 +50,8 @@
 <script setup lang="ts">
 import { Column, DataTable, Button, Drawer, Dialog, InputText, useConfirm, useToast } from "primevue";
 import { onMounted, ref } from "vue";
-import { knowledgeBaseService } from "../api-service";
+import { knowledgeBaseService } from "@/api-service";
+import { useRouter } from "vue-router";
 
 interface KnowledgeBaseRecord {
 	name: string;
@@ -58,6 +59,7 @@ interface KnowledgeBaseRecord {
 
 const confirm = useConfirm();
 const toast = useToast();
+const router = useRouter();
 
 const records = ref<KnowledgeBaseRecord[]>([]);
 const loading = ref(false);
@@ -74,7 +76,6 @@ const fetchRecords = async () => {
 	error.value = null;
 	try {
 		const response = await knowledgeBaseService.getAllRecords();
-		console.log(response.data)
 		records.value = response.data.sources.map((source: string) => ({
 			name: source,
 		}));
@@ -87,7 +88,8 @@ const fetchRecords = async () => {
 
 const onRowClick = (event: any) => {
 	selectedRecord.value = event.data;
-	drawerVisible.value = true;
+	router.push({ name: "KnowledgeBaseRecord", params: { id: event.data.name } });
+	// drawerVisible.value = true;
 };
 
 const onDelete = (record: KnowledgeBaseRecord) => {
