@@ -35,26 +35,31 @@
 		<div v-else-if="recordData" class="bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-bold mb-4">{{ recordData.source }}</h2>
 			<div class="space-y-4">
-				<div v-for="(chunk, index) in recordData.chunks" :key="index" class="prose prose-sm max-w-none">
-					<div class="text-gray-700 whitespace-pre-wrap">{{ chunk }}</div>
-				</div>
+				<Editor v-model="editorText" />
 			</div>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import { Button, Select } from "primevue";
 import { knowledgeBaseService } from "@/api-service";
+import { marked } from "marked";
+import { Button, Select } from "primevue";
+import Editor from "primevue/editor";
+import TurndownService from 'turndown';
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 const router = useRouter();
 const route = useRoute();
+
 const records = ref<any[]>([]);
 const currentRecord = ref<string>("");
 const recordData = ref<any>(null);
 const isLoadingRecord = ref(false);
+const editorText = ref("");
+
+const turndownService = new TurndownService()
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -82,6 +87,16 @@ const fetchRecord = async (recordName: string) => {
 watch(currentRecord, (newRecord) => {
 	if (newRecord) {
 		fetchRecord(newRecord);
+	}
+});
+// 1. Incoming: Convert raw Markdown chunks into HTML for PrimeVue
+watch(recordData, async (newData) => {
+	if (newData && newData.chunks) {
+		const combinedMarkdown = newData.chunks.join("");
+		// Converts "## Heading" into "<h2>Heading</h2>"
+		editorText.value = await marked.parse(combinedMarkdown);
+	} else {
+		editorText.value = "";
 	}
 });
 
