@@ -1,7 +1,6 @@
-import os
 
 from langchain_chroma.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import MarkdownTextSplitter
 from langchain_core.documents import Document
 from langchain_core.indexing import IndexingResult, index
@@ -11,10 +10,7 @@ CHROMA_DB_PATH = "./chroma_db"
 RECORD_MANAGER_DB = "sqlite:///./record_manager.db"
 NAMESPACE = "chroma/patterngen"
 
-embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY"),
-)
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embeddings)
 
@@ -45,11 +41,15 @@ async def chroma_search(query: str, k: int = 3) -> str:
     return "\n\n".join([doc.page_content for doc in results])
 
 
-def delete_source(source: str) -> None:
+def delete_source(source: str, clear_key: bool = False) -> None:
+    """
+    clears document from vector store while persisting the record. If clear_key is True, clears the record entirely
+    """
     # delete from vector store
     vector_store.delete(where={"source": source})
 
     # # delete from record manager
-    # keys = record_manager.list_keys(group_ids=[source])
-    # if keys:
-    #     record_manager.delete_keys(keys)
+    if clear_key:
+        keys = record_manager.list_keys(group_ids=[source])
+        if keys:
+            record_manager.delete_keys(keys)

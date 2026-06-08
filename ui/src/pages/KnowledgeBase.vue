@@ -2,11 +2,15 @@
 	<div class="p-4">
 		<h1 class="text-2xl font-bold mb-4">Knowledge Base</h1>
 		<div v-if="error" class="text-red-600 mb-4">{{ error }}</div>
-		<div class="rounded-md p-3 bg-white shadow-sm">
+		<div class="rounded-md p-5 bg-white shadow-sm">
 			<div class="mb-4">
 				<Button label="Upload Document" icon="pi pi-upload" @click="dialogVisible = true" />
 			</div>
 			<DataTable :value="records" :loading="loading" row-hover @row-click="onRowClick">
+				<template #empty>
+					<span class="text-slate-500">No records yet</span>
+				</template>
+
 				<Column field="name" header="Record Name"></Column>
 				<Column header="Actions">
 					<template #body="{ data }">
@@ -27,20 +31,38 @@
 			</div>
 		</Drawer>
 
-		<Dialog v-model:visible="dialogVisible" header="Upload Document" :modal="true" class="w-full md:w-96">
+		<Dialog
+			v-model:visible="dialogVisible"
+			header="Upload Document"
+			:modal="true"
+			class="w-full"
+			style="width: 500px"
+			:dismissable-mask="!uploading"
+		>
 			<div class="space-y-4">
 				<div>
-					<label for="source" class="block text-sm font-medium mb-2">Source Query String</label>
-					<InputText id="source" v-model="sourceInput" placeholder="Enter source" class="w-full" />
+					<FormField label="Source Query String" :tip="{ message: 'the vector db will use this to index documents' }">
+						<InputText id="source" v-model="sourceInput" placeholder="Enter source" class="w-full" />
+					</FormField>
 				</div>
-				<div>
-					<label for="file" class="block text-sm font-medium mb-2">Select File</label>
-					<input id="file" type="file" @change="onFileChange" class="w-full" />
+				<div class="flex flex-col gap-5">
+					<Message severity="info">Only markdown and plain text files are supported</Message>
+					<FileUpload
+						ref="fileUploadRef"
+						name="file"
+						:auto="false"
+						choose-label="Choose File"
+						:show-upload-button="false"
+						:show-cancel-button="false"
+						@select="onFileSelect"
+						accept="*"
+						:max-file-size="104857600"
+					/>
 					<div v-if="selectedFile" class="mt-2 text-sm text-gray-600">Selected: {{ selectedFile.name }}</div>
 				</div>
 			</div>
 			<template #footer>
-				<Button label="Cancel" icon="pi pi-times" text @click="dialogVisible = false" />
+				<Button label="Cancel" severity="secondary" icon="pi pi-times" text @click="dialogVisible = false" :disabled="uploading" />
 				<Button label="Upload" icon="pi pi-upload" :loading="uploading" @click="onUpload" />
 			</template>
 		</Dialog>
@@ -48,10 +70,11 @@
 </template>
 
 <script setup lang="ts">
-import { Column, DataTable, Button, Drawer, Dialog, InputText, useConfirm, useToast } from "primevue";
+import { Column, DataTable, Button, Drawer, Dialog, InputText, FileUpload, useConfirm, useToast, Message } from "primevue";
 import { onMounted, ref } from "vue";
 import { knowledgeBaseService } from "@/api-service";
 import { useRouter } from "vue-router";
+import FormField from "@/components/form/FormField.vue";
 
 interface KnowledgeBaseRecord {
 	name: string;
@@ -70,6 +93,7 @@ const dialogVisible = ref(false);
 const sourceInput = ref("");
 const selectedFile = ref<File | null>(null);
 const uploading = ref(false);
+const fileUploadRef = ref();
 
 const fetchRecords = async () => {
 	loading.value = true;
@@ -116,9 +140,10 @@ const onDelete = (record: KnowledgeBaseRecord) => {
 	});
 };
 
-const onFileChange = (e: Event) => {
-	const target = e.target as HTMLInputElement;
-	selectedFile.value = target.files?.[0] ?? null;
+const onFileSelect = (event: any) => {
+	if (event.files && event.files.length > 0) {
+		selectedFile.value = event.files[0];
+	}
 };
 
 const onUpload = async () => {
@@ -135,9 +160,10 @@ const onUpload = async () => {
 	try {
 		await knowledgeBaseService.indexDocument(sourceInput.value, selectedFile.value);
 		sourceInput.value = "";
-		const fileInput = document.getElementById("kb-file-input") as HTMLInputElement | null;
-		if (fileInput) fileInput.value = "";
 		selectedFile.value = null;
+		if (fileUploadRef.value) {
+			fileUploadRef.value.clear();
+		}
 		fetchRecords();
 		dialogVisible.value = false;
 		toast.add({ severity: "success", summary: "Uploaded record", life: 3000 });

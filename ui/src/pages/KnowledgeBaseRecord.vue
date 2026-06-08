@@ -1,5 +1,5 @@
 <template>
-	<div class="w-full flex items-center p-2 rounded-xl bg-white shadow-md mx-auto 2xl:max-w-[80%] sticky top-0">
+	<div class="w-full flex items-center p-2 rounded-xl bg-white shadow-md mx-auto 2xl:max-w-[80%] sticky top-0 z-50">
 		<Button
 			label="Prev"
 			icon="pi pi-arrow-left"
