@@ -20,4 +20,14 @@ export const knowledgeBaseService = {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},
+
+	reindexRecord: (source: string, content: string) => {
+		const blob = new Blob([content], { type: "text/markdown" });
+		const file = new File([blob], source, { type: "text/markdown" });
+		const form = new FormData();
+		form.append("file", file);
+		return api.post(`/index-document?source=${encodeURIComponent(source)}`, form, {
+			headers: { "Content-Type": "multipart/form-data" },
+		});
+	},
 } as const;
