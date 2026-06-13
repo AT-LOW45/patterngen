@@ -10,6 +10,7 @@ import PrimeVue from "primevue/config";
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router/router";
+import 'md-editor-v3/lib/style.css';
 
 const init = async () => {
 	const app = createApp(App);

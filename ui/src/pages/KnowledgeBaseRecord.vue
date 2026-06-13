@@ -35,7 +35,7 @@
 		<div v-else-if="recordData" class="bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-bold mb-4">{{ recordData.source }}</h2>
 			<div class="space-y-4">
-				<Editor v-model="editorText" />
+				<MdEditor :model-value="editorText" style="height: 75vh" />
 			</div>
 		</div>
 	</div>
@@ -43,10 +43,8 @@
 
 <script setup lang="ts">
 import { knowledgeBaseService } from "@/api-service";
-import { marked } from "marked";
+import { MdEditor } from "md-editor-v3";
 import { Button, Select } from "primevue";
-import Editor from "primevue/editor";
-import TurndownService from "turndown";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -58,8 +56,6 @@ const currentRecord = ref<string>("");
 const recordData = ref<any>(null);
 const isLoadingRecord = ref(false);
 const editorText = ref("");
-
-const turndownService = new TurndownService();
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -90,9 +86,9 @@ watch(currentRecord, (newRecord) => {
 	}
 });
 
-watch(recordData, async (newData) => {
+watch(recordData, (newData) => {
 	if (newData && newData.content) {
-		editorText.value = await marked.parse(newData.content);
+		editorText.value = newData.content;
 	} else {
 		editorText.value = "";
 	}
