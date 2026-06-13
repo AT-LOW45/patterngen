@@ -1,5 +1,5 @@
 from config.llm_config import groq_llm
-from db.chroma_helper import chroma_search
+from db.chroma_helper import search_index
 from schema.boilerplate_schema import GenerateBoilerplateRequest
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -41,7 +41,7 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
         ]
     )
 
-    context = await chroma_search(request.query)
+    context = await search_index(request.query)
 
     chain = template | groq_llm
     response = await chain.ainvoke(

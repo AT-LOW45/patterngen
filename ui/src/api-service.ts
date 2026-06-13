@@ -9,6 +9,7 @@ const api = axios.create(axiosConfig);
 export const knowledgeBaseService = {
 	getAllRecords: () => api.get("/knowledge-base"),
 	getRecord: (source: string) => api.get(`knowledge-base/${source}`),
+	getRawRecord: (source: string) => api.get(`/knowledge-base/${encodeURIComponent(source)}/raw`),
 	deleteRecord: (source: string) => api.delete(`/knowledge-base/${source}`),
 
 	// POST /index-document?source=<source> with multipart form data containing file

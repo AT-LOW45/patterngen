@@ -20,7 +20,7 @@ record_manager.create_schema()
 splitter = MarkdownTextSplitter(chunk_size=1500, chunk_overlap=0, keep_separator=True)
 
 
-def add_documents(documents: list[Document], source: str) -> IndexingResult:
+def add_to_index(documents: list[Document], source: str) -> IndexingResult:
     for doc in documents:
         doc.metadata["source"] = source
 
@@ -36,12 +36,12 @@ def add_documents(documents: list[Document], source: str) -> IndexingResult:
     return result
 
 
-async def chroma_search(query: str, k: int = 3) -> str:
+async def search_index(query: str, k: int = 3) -> str:
     results = await vector_store.asimilarity_search(query, k=k)
     return "\n\n".join([doc.page_content for doc in results])
 
 
-def delete_source(source: str, clear_key: bool = False) -> None:
+def delete_from_index(source: str, clear_key: bool = False) -> None:
     """
     clears document from vector store while persisting the record. If clear_key is True, clears the record entirely
     """

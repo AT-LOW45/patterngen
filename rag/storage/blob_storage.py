@@ -15,17 +15,20 @@ client = boto3.client(
 
 BUCKET = os.getenv("BLOB_BUCKET", "patterngen-docs")
 
-def upload_document(content: str, source: str) -> None:
+
+def upload_to_blob(content: str, source: str) -> None:
     client.put_object(
         Bucket=BUCKET,
-        Key=f"{source}.md",
+        Key=source,
         Body=content.encode("utf-8"),
         ContentType="text/markdown",
     )
 
-def get_document(source: str) -> str:
-    response = client.get_object(Bucket=BUCKET, Key=f"{source}.md")
+
+def get_from_blob(source: str) -> str:
+    response = client.get_object(Bucket=BUCKET, Key=source)
     return response["Body"].read().decode("utf-8")
 
-def delete_document(source: str) -> None:
+
+def delete_from_blob(source: str) -> None:
     client.delete_object(Bucket=BUCKET, Key=f"{source}.md")

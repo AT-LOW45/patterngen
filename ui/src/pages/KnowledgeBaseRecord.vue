@@ -46,7 +46,7 @@ import { knowledgeBaseService } from "@/api-service";
 import { marked } from "marked";
 import { Button, Select } from "primevue";
 import Editor from "primevue/editor";
-import TurndownService from 'turndown';
+import TurndownService from "turndown";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -59,7 +59,7 @@ const recordData = ref<any>(null);
 const isLoadingRecord = ref(false);
 const editorText = ref("");
 
-const turndownService = new TurndownService()
+const turndownService = new TurndownService();
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -74,7 +74,7 @@ const fetchRecord = async (recordName: string) => {
 	if (!recordName) return;
 	isLoadingRecord.value = true;
 	try {
-		const response = await knowledgeBaseService.getRecord(recordName);
+		const response = await knowledgeBaseService.getRawRecord(recordName);
 		recordData.value = response.data;
 	} catch (error) {
 		console.error("Failed to fetch record:", error);
@@ -89,12 +89,10 @@ watch(currentRecord, (newRecord) => {
 		fetchRecord(newRecord);
 	}
 });
-// 1. Incoming: Convert raw Markdown chunks into HTML for PrimeVue
+
 watch(recordData, async (newData) => {
-	if (newData && newData.chunks) {
-		const combinedMarkdown = newData.chunks.join("");
-		// Converts "## Heading" into "<h2>Heading</h2>"
-		editorText.value = await marked.parse(combinedMarkdown);
+	if (newData && newData.content) {
+		editorText.value = await marked.parse(newData.content);
 	} else {
 		editorText.value = "";
 	}

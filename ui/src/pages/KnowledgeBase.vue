@@ -55,7 +55,7 @@
 						:show-upload-button="false"
 						:show-cancel-button="false"
 						@select="onFileSelect"
-						accept="*"
+						accept=".md,text/markdown,text/plain"
 						:max-file-size="104857600"
 					/>
 					<div v-if="selectedFile" class="mt-2 text-sm text-gray-600">Selected: {{ selectedFile.name }}</div>
