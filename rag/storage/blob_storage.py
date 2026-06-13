@@ -31,4 +31,4 @@ def get_from_blob(source: str) -> str:
 
 
 def delete_from_blob(source: str) -> None:
-    client.delete_object(Bucket=BUCKET, Key=f"{source}.md")
+    client.delete_object(Bucket=BUCKET, Key=f"{source}")
