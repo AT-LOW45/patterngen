@@ -1,7 +1,7 @@
 
 from langchain_chroma.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_text_splitters import MarkdownTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
 from langchain_core.indexing import IndexingResult, index
 from langchain_classic.indexes import SQLRecordManager
@@ -17,14 +17,31 @@ vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embed
 record_manager = SQLRecordManager(namespace=NAMESPACE, db_url=RECORD_MANAGER_DB)
 record_manager.create_schema()
 
-splitter = MarkdownTextSplitter(chunk_size=1500, chunk_overlap=0, keep_separator=True)
+header_splitter = MarkdownHeaderTextSplitter(
+    headers_to_split_on=[
+        ("#", "title"),
+        ("##", "section"),
+        ("###", "subsection"),
+    ],
+    strip_headers=False,
+)
+
+
+def split_documents(documents: list[Document]) -> list[Document]:
+    chunks = []
+    for doc in documents:
+        header_chunks = header_splitter.split_text(doc.page_content)
+        for chunk in header_chunks:
+            chunk.metadata.update(doc.metadata)
+        chunks.extend(header_chunks)
+    return chunks
 
 
 def add_to_index(documents: list[Document], source: str) -> IndexingResult:
     for doc in documents:
         doc.metadata["source"] = source
 
-    chunks = splitter.split_documents(documents)
+    chunks = split_documents(documents)
 
     result = index(
         chunks,
