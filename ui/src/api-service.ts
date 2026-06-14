@@ -16,7 +16,7 @@ export const knowledgeBaseService = {
 	indexDocument: (source: string, file: File) => {
 		const form = new FormData();
 		form.append("file", file);
-		return api.post(`/index-document?source=${encodeURIComponent(source)}`, form, {
+		return api.post(`/knowledge-base/index-document?source=${encodeURIComponent(source)}`, form, {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},
@@ -26,7 +26,7 @@ export const knowledgeBaseService = {
 		const file = new File([blob], source, { type: "text/markdown" });
 		const form = new FormData();
 		form.append("file", file);
-		return api.post(`/index-document?source=${encodeURIComponent(source)}`, form, {
+		return api.post(`/knowledge-base/index-document?source=${encodeURIComponent(source)}`, form, {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},
