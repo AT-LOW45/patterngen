@@ -33,6 +33,10 @@
 			{
 				"command": "patterngen.generateBoilerplate",
 				"title": "Generate Boilerplate"
+			},
+			{
+				"command": "patterngen.openKnowledgeBase",
+				"title": "Open Knowledge Base"
 			}
 		]
 	},

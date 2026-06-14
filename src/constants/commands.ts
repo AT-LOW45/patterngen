@@ -5,6 +5,9 @@ const COMMANDS = {
 	generateBoilerPlate: {
 		id: "patterngen.generateBoilerplate",
 	},
+	openKnowledgeBase: {
+		id: "patterngen.openKnowledgeBase"
+	}
 } as const;
 
 export default COMMANDS;

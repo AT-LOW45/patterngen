@@ -1,10 +1,11 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
 import * as dotenv from "dotenv";
-import COMMANDS from "./constants/commands";
-import wrapInTryCatch from "./commands/wrap-in-try-catch";
+import * as vscode from "vscode";
 import generateBoilerplate from "./commands/generate-boilerplate";
+import openKnowledgeBase from './commands/open-knowledge-base';
+import wrapInTryCatch from "./commands/wrap-in-try-catch";
+import COMMANDS from "./constants/commands";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)),
 		registerCommand(COMMANDS.generateBoilerPlate.id, () => generateBoilerplate(context)),
+		registerCommand(COMMANDS.openKnowledgeBase.id, () => openKnowledgeBase()),
 	);
 }
 
