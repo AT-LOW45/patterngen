@@ -35,7 +35,7 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
         [
             (
                 "system",
-                f"You are a code generator for {{language}}. Generate code that strictly follows these company coding standards:\n\n{{context}}\n\n{selection_note}\n\n. If the standards include examples in multiple languages, only use the {{language}} implementation. Return only the code, no explanations, no markdown code fences.",
+                "You are a code generator for {language}. Generate code that strictly follows these company coding standards:\n\n{context}\n\n{selection_note}\n\n. If the standards include examples in multiple languages, only use the {language} implementation. Return only the code, no explanations, no markdown code fences.",
             ),
             ("human", "{prompt}"),
         ]
@@ -49,7 +49,7 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
             "context": context,
             "prompt": request.query,
             "language": request.language,
-            "selection_context": request.selection_context,
+            "selection_note": selection_note,
         }
     )
     return strip_code_fences(str(response.content))
