@@ -1,71 +1,114 @@
-# patterngen README
+# Patterngen
 
-This is the README for your extension "patterngen". After writing up a brief description, we recommend including the following sections.
+**RAG-based code generation that enforces your team's architectural decisions.**
 
-## Features
+Patterngen is a VS Code extension that generates boilerplate grounded in your own **Architecture Decision Records (ADRs)**. Instead of producing generic code, it retrieves the ADRs relevant to what you're building and instructs the LLM to follow them — so generated code matches your team's conventions for error handling, data fetching, response shapes, and whatever else you've documented.
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## How it works
 
-For example if there is an image subfolder under your extension project workspace:
+```
+VS Code (generate boilerplate)
+        │  prompt + language + selected code
+        ▼
+FastAPI backend  ──►  retrieve relevant ADRs (ChromaDB vector search)
+        │                     │
+        │  ◄──────────────────┘  full ADRs, in document order
+        ▼
+      LLM  ──►  code that follows the retrieved ADRs
+        │
+        ▼
+   inserted at your cursor
+```
 
-\!\[feature X\]\(images/feature-x.png\)
+The key idea is in retrieval: rather than returning scattered chunks, Patterngen identifies which **whole ADRs** are relevant to your request and feeds them to the LLM in full — so the concrete code examples in an ADR are never dropped. Irrelevant requests retrieve nothing, so the model just generates normally instead of being misled.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Project structure
 
-## Requirements
+| Path | Stack | Role |
+|------|-------|------|
+| `rag/` | Python · FastAPI · LangChain · ChromaDB | Backend: indexes ADRs, retrieves context, generates code |
+| `ui/` | Vue 3 · Vite · PrimeVue · TypeScript | Knowledge-base manager: upload, edit, delete ADRs |
+| `src/` | TypeScript · VS Code API | The extension itself |
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+The Vue app is built to `ui/dist` and served by FastAPI at `/`, so the backend and knowledge-base UI run as a single server.
 
-## Extension Settings
+## Prerequisites
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- **Python ≥ 3.13** and [`uv`](https://docs.astral.sh/uv/)
+- **Node.js** (for the Vue knowledge-base UI)
+- An **LLM API key** — Groq is the current default; the provider is configurable (see [llm_config.py](rag/config/llm_config.py))
+- An **S3-compatible blob store** (for persisting raw ADR content)
 
-For example:
+## Setup
 
-This extension contributes the following settings:
+### 1. Configure environment
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+Create a `.env` at the repo root (the `GROQ_API_KEY` below reflects the current default LLM provider — adjust if you configure a different one):
 
-## Known Issues
+```env
+GROQ_API_KEY=your_groq_key
+API_ENDPOINT=http://localhost:8000
+BLOB_ENDPOINT=https://your-s3-endpoint
+BLOB_ACCESS_KEY=...
+BLOB_SECRET_KEY=...
+BLOB_BUCKET=patterngen-docs
+```
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+### 2. Build the knowledge-base UI
 
-## Release Notes
+```bash
+cd ui
+npm install
+npm run build        # outputs to ui/dist, served by the backend
+```
 
-Users appreciate release notes as you update your extension.
+> `ui/.env` should set `VITE_API_ENDPOINT=http://localhost:8000` (same origin as the backend). Rebuild after changing it. For UI development with hot-reload, run `npm run dev` (Vite on :5173) instead.
 
-### 1.0.0
+### 3. Run the backend
 
-Initial release of ...
+```bash
+cd rag
+uv run python main.py    # FastAPI on http://localhost:8000 (reload enabled)
+```
 
-### 1.0.1
+The knowledge-base UI is now available at `http://localhost:8000`.
 
-Fixed issue #.
+### 4. Run the extension
 
-### 1.1.0
+Open the repo in VS Code and press **F5** to launch an Extension Development Host with Patterngen loaded.
 
-Added features X, Y, and Z.
+## Usage
 
----
+| Command | What it does |
+|---------|--------------|
+| **Patterngen: Generate Boilerplate** | Prompts for what to generate, detects the active file's language, optionally uses your selected code as context, and inserts ADR-grounded code at the cursor. |
+| **Patterngen: Open Knowledge Base** | Opens the knowledge-base UI (the `ragEndpoint`) in your browser to manage ADRs. |
 
-## Following extension guidelines
+### Managing ADRs
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+Use the knowledge base UI to upload markdown ADRs, edit them in-place, and delete them. ADRs are chunked by markdown header and indexed for retrieval. To replace an existing ADR, re-upload it with the **same source name** — indexing is incremental and will swap the old chunks for the new ones.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+## Configuration
 
-## Working with Markdown
+This extension contributes the following setting:
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+- `patterngen.ragEndpoint` — URL of the RAG backend. Default: `http://localhost:8000`.
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## Retrieval details
 
-## For more information
+- **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2` (HuggingFace)
+- **Vector store:** ChromaDB (persisted to `rag/chroma_db`)
+- **Chunking:** `MarkdownHeaderTextSplitter` on `#`/`##`/`###`, headers preserved, one chunk per section
+- **Dedup:** LangChain incremental indexing with a SQLite record manager
+- **LLM:** Groq `llama-3.3-70b-versatile` by default — configurable in [llm_config.py](rag/config/llm_config.py)
+- **Retrieval:** ranks whole ADRs by their best-matching chunk, keeps those above a relevance threshold (capped), and returns each in full reassembled in document order
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## Known limitations
 
-**Enjoy!**
+- Retrieval quality is bounded by the embedding model (`all-MiniLM-L6-v2`), which is small and general-purpose — it's sensitive to whether your prompt uses the same vocabulary as the ADR. A stronger/code-aware embedding model or query enrichment (e.g. HyDE) is the durable improvement.
+- The relevance threshold is calibrated against a small knowledge base; revisit it as you add more ADRs.
+
+## Development
+
+- [DEVLOG.md](DEVLOG.md) — dated engineering journal
+- [CHANGELOG.md](CHANGELOG.md) — user-facing release notes

@@ -23,6 +23,12 @@ This is the internal engineering journal — for user-facing release notes see [
 - Tuned `score_threshold` against observed relevance scores: started 0.15 → 0.1 → **0.0**. A task-phrased query ("create a hook to fetch products") scored only 0.010 for the relevant ADR and was being filtered out as a false negative. Junk/vague queries score *negative*, so 0.0 cleanly separates genuine matches from noise.
 - Verified end-to-end: error-handling and products-hook prompts now generate ADR-compliant code (custom exception classes + `{data,error}` shape; TanStack Query + `apiFetcher` respectively).
 
+### Investigated — SQLRecordManager / langchain-classic (no action)
+- Questioned whether `SQLRecordManager` (imported from `langchain_classic.indexes` in [rag/db/chroma_helper.py](rag/db/chroma_helper.py)) is on a deprecation path. Checked installed versions (langchain 1.3.1, core 1.4.0, classic 1.0.7) and the official v1 migration guide.
+- Findings: `langchain-classic` is **not deprecated** — it's a deliberate permanent home for functionality "outside the focus of standard interfaces and agents." The whole indexing API (`index()`, `RecordManager`, `SQLRecordManager`) was *moved* there in v0.3→v1, not retired. Our `langchain_classic.indexes` import is the officially correct, current path.
+- There is no more-modern replacement: the record-manager + `index(cleanup="incremental")` pattern is still the supported way to do dedup/incremental indexing. `DocumentIndex` is an alternative storage target, not a RecordManager replacement. `InMemoryRecordManager` (core) is non-persistent, so not viable here.
+- Conclusion: no change needed. Revisit only if LangChain announces a deprecation. Refs: [v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1), [langchain_classic indexes reference](https://reference.langchain.com/python/langchain-classic/indexes).
+
 ### Notes / known limitations
 - The `0.0` threshold is calibrated against only 2 ADRs — recheck as the knowledge base grows.
 - Root cause of fragile retrieval is the embedding model (`all-MiniLM-L6-v2`): small, general-purpose, weak on code/architecture vocabulary. Durable fix is a stronger/code-aware embedding model and/or query enrichment (e.g. HyDE) — not threshold tuning.
