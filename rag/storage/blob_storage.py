@@ -2,6 +2,7 @@ import os
 import boto3
 from pathlib import Path
 from dotenv import load_dotenv
+from exception.document_not_found_error import DocumentNotFoundError
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -26,8 +27,11 @@ def upload_to_blob(content: str, source: str) -> None:
 
 
 def get_from_blob(source: str) -> str:
-    response = client.get_object(Bucket=BUCKET, Key=source)
-    return response["Body"].read().decode("utf-8")
+    try:
+        response = client.get_object(Bucket=BUCKET, Key=source)
+        return response["Body"].read().decode("utf-8")
+    except:
+        raise DocumentNotFoundError("no document found")
 
 
 def delete_from_blob(source: str) -> None:

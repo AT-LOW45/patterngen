@@ -1,11 +1,13 @@
 from db.chroma_helper import delete_from_index
+from exception.document_not_found_error import DocumentNotFoundError
 from fastapi.responses import JSONResponse
-from fastapi import UploadFile, File, APIRouter
+from fastapi import HTTPException, UploadFile, File, APIRouter
 from db.chroma_helper import vector_store
 from storage.blob_storage import delete_from_blob, get_from_blob
 from service.knowledge_base_service import index_document as kb_index_document
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
+
 
 @router.post("/index-document")
 async def index_document_endpoint(file: UploadFile = File(...), source: str = ""):
@@ -24,7 +26,10 @@ async def index_document_endpoint(file: UploadFile = File(...), source: str = ""
 
 @router.get("/{source}/raw")
 async def get_document_raw(source: str):
-    content = get_from_blob(source)
+    try:
+        content = get_from_blob(source)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Document '{source}' not found")
     return JSONResponse(content={"source": source, "content": content})
 
 
