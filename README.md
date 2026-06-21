@@ -96,7 +96,7 @@ This extension contributes the following setting:
 
 ## Retrieval details
 
-- **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2` (HuggingFace)
+- **Embeddings:** `BAAI/bge-base-en-v1.5` (HuggingFace, local) — normalized, cosine distance, with a query-instruction prefix for asymmetric retrieval
 - **Vector store:** ChromaDB (persisted to `rag/chroma_db`)
 - **Chunking:** `MarkdownHeaderTextSplitter` on `#`/`##`/`###`, headers preserved, one chunk per section
 - **Dedup:** LangChain incremental indexing with a SQLite record manager
@@ -105,8 +105,8 @@ This extension contributes the following setting:
 
 ## Known limitations
 
-- Retrieval quality is bounded by the embedding model (`all-MiniLM-L6-v2`), which is small and general-purpose — it's sensitive to whether your prompt uses the same vocabulary as the ADR. A stronger/code-aware embedding model or query enrichment (e.g. HyDE) is the durable improvement.
-- The relevance threshold is calibrated against a small knowledge base; revisit it as you add more ADRs.
+- The relevance threshold (`0.5`) is calibrated against a small knowledge base; revisit it as you add more ADRs, since a stronger embedding model compresses scores into a narrower band.
+- Retrieval still depends somewhat on phrasing. If quality degrades as the knowledge base grows, query enrichment (e.g. HyDE) or a hosted embedding model are the next levers.
 
 ## Development
 

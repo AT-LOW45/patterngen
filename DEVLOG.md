@@ -29,6 +29,16 @@ This is the internal engineering journal — for user-facing release notes see [
 - There is no more-modern replacement: the record-manager + `index(cleanup="incremental")` pattern is still the supported way to do dedup/incremental indexing. `DocumentIndex` is an alternative storage target, not a RecordManager replacement. `InMemoryRecordManager` (core) is non-persistent, so not viable here.
 - Conclusion: no change needed. Revisit only if LangChain announces a deprecation. Refs: [v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1), [langchain_classic indexes reference](https://reference.langchain.com/python/langchain-classic/indexes).
 
+### Embedding model upgrade — MiniLM → bge-base-en-v1.5
+- Swapped the embedding model in [rag/db/chroma_helper.py](rag/db/chroma_helper.py) from `all-MiniLM-L6-v2` to `BAAI/bge-base-en-v1.5` (free, local, no API/cost). Added normalized embeddings, cosine distance on the Chroma collection, and bge's query-instruction prefix for asymmetric (short query → long passage) retrieval.
+- bge is 768-dim vs MiniLM's 384, so the Chroma collection + record manager had to be rebuilt from scratch. Backed up both ADRs first, wiped `chroma_db`/`record_manager.db`, reindexed. Also promoted both ADRs to source-of-truth files under [docs/adr/](docs/adr/).
+- **Results (same scoring harness):** the false-negative is fixed — "create a hook to fetch products" went from **0.010 → 0.658** and now retrieves the right ADR. bge also *corrected* a MiniLM ranking error: on "handle errors in an API route", MiniLM ranked the frontend ADR above the error ADR; bge ranks the error ADR first (0.680 vs 0.669). Genuine queries now rank the correct ADR top; junk (cookies, weather) returns empty.
+- **Recalibrated threshold** against 10 test queries (5 genuine, 5 junk): bge compresses scores into a high band, so the old `0.0` was meaningless. Genuine floor 0.567, junk ceiling 0.415 → set `score_threshold = 0.5` (≈0.085 margin both sides). Far more robust than the prior single-point calibration.
+
+### Reusable threshold calibration tool
+- Added [rag/scripts/calibrate_threshold.py](rag/scripts/calibrate_threshold.py) — the standing way to recalibrate `score_threshold`. Run `cd rag && uv run python scripts/calibrate_threshold.py`. It scores editable GENUINE vs JUNK query lists, reports the genuine floor / junk ceiling / gap, and suggests the midpoint threshold (warns if the bands overlap, which means the embedding model can't discriminate).
+- **Re-run it after** changing the embedding model, adding a batch of ADRs, or if the generator starts ignoring relevant ADRs / pulling in irrelevant ones. Keep the GENUINE/JUNK lists representative of the real knowledge base.
+
 ### Notes / known limitations
 - The `0.0` threshold is calibrated against only 2 ADRs — recheck as the knowledge base grows.
 - Root cause of fragile retrieval is the embedding model (`all-MiniLM-L6-v2`): small, general-purpose, weak on code/architecture vocabulary. Durable fix is a stronger/code-aware embedding model and/or query enrichment (e.g. HyDE) — not threshold tuning.

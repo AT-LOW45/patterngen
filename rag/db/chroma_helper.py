@@ -10,9 +10,26 @@ CHROMA_DB_PATH = "./chroma_db"
 RECORD_MANAGER_DB = "sqlite:///./record_manager.db"
 NAMESPACE = "chroma/patterngen"
 
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+# bge-base-en-v1.5 is a stronger, code/architecture-aware retrieval model than
+# all-MiniLM-L6-v2. It wants normalized embeddings + cosine distance, and a query
+# instruction prefix for asymmetric (short query -> long passage) retrieval.
+# Note: 768-dim — changing this model requires rebuilding the Chroma collection.
+BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embeddings)
+embeddings = HuggingFaceEmbeddings(
+    model_name="BAAI/bge-base-en-v1.5",
+    encode_kwargs={"normalize_embeddings": True},
+    query_encode_kwargs={
+        "normalize_embeddings": True,
+        "prompt": BGE_QUERY_INSTRUCTION,
+    },
+)
+
+vector_store = Chroma(
+    persist_directory=CHROMA_DB_PATH,
+    embedding_function=embeddings,
+    collection_metadata={"hnsw:space": "cosine"},
+)
 
 record_manager = SQLRecordManager(namespace=NAMESPACE, db_url=RECORD_MANAGER_DB)
 record_manager.create_schema()
@@ -66,7 +83,7 @@ def _assemble_source(source: str) -> str:
 async def search_index(
     query: str,
     candidate_k: int = 36,
-    score_threshold: float = 0,
+    score_threshold: float = 0.5,
     max_sources: int = 3,
 ) -> str:
     """
