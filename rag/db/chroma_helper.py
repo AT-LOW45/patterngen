@@ -66,7 +66,7 @@ def _assemble_source(source: str) -> str:
 async def search_index(
     query: str,
     candidate_k: int = 36,
-    score_threshold: float = 0.1,
+    score_threshold: float = 0,
     max_sources: int = 3,
 ) -> str:
     """
