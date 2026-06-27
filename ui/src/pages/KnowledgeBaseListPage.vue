@@ -1,11 +1,11 @@
 <template>
 	<div class="p-4">
-		<h1 class="text-2xl font-bold mb-4">Knowledge Base</h1>
+		<div class="flex items-center justify-between w-full">
+			<h1 class="text-2xl font-semibold mb-4">Knowledge Base</h1>
+			<Button label="Create ADR" aria-controls="create-adr-menu" aria-haspopup="true" @click="toggle" />
+		</div>
 		<div v-if="error" class="text-red-600 mb-4">{{ error }}</div>
-		<div class="rounded-md p-5 bg-white shadow-sm">
-			<div class="mb-4">
-				<Button label="Upload Document" icon="pi pi-upload" @click="dialogVisible = true" />
-			</div>
+		<div class="rounded-md p-5 bg-white shadow-sm mt-3">
 			<DataTable :value="records" :loading="loading" row-hover @row-click="onRowClick">
 				<template #empty>
 					<span class="text-slate-500">No records yet</span>
@@ -22,14 +22,7 @@
 			</DataTable>
 		</div>
 
-		<Drawer v-model:visible="drawerVisible" header="Record Details" position="right" :modal="true">
-			<div v-if="selectedRecord">
-				<p>
-					<strong>Name:</strong>
-					{{ selectedRecord.name }}
-				</p>
-			</div>
-		</Drawer>
+		<Menu ref="menu" popup :model="menuItems" id="create-adr-menu"></Menu>
 
 		<Dialog
 			v-model:visible="dialogVisible"
@@ -47,17 +40,36 @@
 				</div>
 				<div class="flex flex-col gap-5">
 					<Message severity="info">Only markdown and plain text files are supported</Message>
-					<FileUpload
-						ref="fileUploadRef"
-						name="file"
-						:auto="false"
-						choose-label="Choose File"
-						:show-upload-button="false"
-						:show-cancel-button="false"
-						@select="onFileSelect"
-						accept=".md,text/markdown,text/plain"
-						:max-file-size="104857600"
-					/>
+					<div class="flex flex-col gap-2">
+						<FileUpload
+							ref="fileUploadRef"
+							name="file"
+							:auto="false"
+							choose-label="Choose File"
+							:show-upload-button="false"
+							:show-cancel-button="false"
+							@select="onFileSelect"
+							:multiple="false"
+							accept=".md,text/markdown,text/plain"
+							:max-file-size="104857600"
+						>
+							<template #content>
+								<div
+									v-if="selectedFile"
+									class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-50 dark:border-surface-700 bg-slate-100 dark:bg-surface-800 w-full"
+								>
+									<i class="pi pi-file text-surface-500 dark:text-surface-400 shrink-0" />
+									<span class="flex-1 text-sm text-surface-700 dark:text-surface-200 truncate min-w-0" :title="selectedFile.name">
+										{{ selectedFile.name }}
+									</span>
+									<span class="text-xs text-surface-400 dark:text-surface-500 shrink-0 whitespace-nowrap">
+										{{ formatFileSize(selectedFile.size) }}
+									</span>
+									<Button text size="small" icon="pi pi-times" severity="secondary" rounded @click="clearFile" />
+								</div>
+							</template>
+						</FileUpload>
+					</div>
 					<div v-if="selectedFile" class="mt-2 text-sm text-gray-600">Selected: {{ selectedFile.name }}</div>
 				</div>
 			</div>
@@ -70,11 +82,13 @@
 </template>
 
 <script setup lang="ts">
-import { Column, DataTable, Button, Drawer, Dialog, InputText, FileUpload, useConfirm, useToast, Message } from "primevue";
-import { onMounted, ref } from "vue";
 import { knowledgeBaseService } from "@/api-service";
-import { useRouter } from "vue-router";
 import FormField from "@/components/form/FormField.vue";
+import ROUTES from "@/router/routes";
+import { Button, Column, DataTable, Dialog, FileUpload, InputText, Menu, Message, useConfirm, useToast } from "primevue";
+import { MenuItem } from "primevue/menuitem";
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
 interface KnowledgeBaseRecord {
 	name: string;
@@ -87,13 +101,34 @@ const router = useRouter();
 const records = ref<KnowledgeBaseRecord[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const drawerVisible = ref(false);
 const selectedRecord = ref<KnowledgeBaseRecord | null>(null);
 const dialogVisible = ref(false);
 const sourceInput = ref("");
 const selectedFile = ref<File | null>(null);
 const uploading = ref(false);
 const fileUploadRef = ref();
+const menu = ref();
+const menuItems = ref<MenuItem[]>([
+	{
+		label: "Choose method to create ADR",
+		items: [
+			{
+				label: "Upload Document",
+				icon: "pi pi-upload",
+				command: () => (dialogVisible.value = true),
+			},
+			{
+				label: "Create with Template",
+				icon: "pi pi-pen-to-square",
+				command: () => router.push(ROUTES.knowledgeBaseCreate),
+			},
+		],
+	},
+]);
+
+const toggle = (event: PointerEvent) => {
+	menu.value?.toggle(event);
+};
 
 const fetchRecords = async () => {
 	loading.value = true;
@@ -144,6 +179,17 @@ const onFileSelect = (event: any) => {
 	if (event.files && event.files.length > 0) {
 		selectedFile.value = event.files[0];
 	}
+};
+
+const clearFile = () => {
+	selectedFile.value = null;
+	fileUploadRef.value?.clear();
+};
+
+const formatFileSize = (bytes: number): string => {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const onUpload = async () => {

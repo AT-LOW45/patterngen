@@ -1,6 +1,8 @@
 // tailwind styles
 import "@/styles/tailwind.css";
 import "primeicons/primeicons.css";
+// Supports weights 100-900
+import '@fontsource-variable/outfit/wght.css';
 
 // other imports
 import { definePreset } from "@primevue/themes";

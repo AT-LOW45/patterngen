@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
+body {
+	font-family: 'Outfit Variable', sans-serif;
+}
+
 :root {
 	font-size: 14px;
+	font-weight: 300;
 	color: #4b5563;
 	background-color: #f9fafc;
 }
