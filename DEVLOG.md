@@ -34,6 +34,11 @@ This is the internal engineering journal — for user-facing release notes see [
 - Frontend fetches it on mount; header shows "Assigning ID…" and **Create** is disabled until the id arrives; on fetch failure it stays disabled (avoids overwriting an existing id). Verified: with adr-001/002/003 indexed, next id = `ADR-004`.
 - Known caveat: best-effort, not a reservation — concurrent creates could get the same id (ties into the overwrite-guard item).
 
+### Cleanup — form validation via zod composable
+- Replaced the create page's hand-rolled `validate()` + `errors` ref with the reusable `useZodValidation` composable ([ui/src/composables/useZodValidation.ts](ui/src/composables/useZodValidation.ts)) driven by a new [adrSchema.ts](ui/src/schemas/adrSchema.ts) (title/status/scope/decision required; extra form keys ignored).
+- `submitAdr` calls `validate(form.value)` (composable owns the error toast); a `watch(form, simpleValidate, { deep: true })` re-validates live after the first failed submit so errors clear as fields are fixed. `FormField`s bind `validationErrors?.properties?.<field>?.errors`. Verified the treeifyError shape matches the binding path.
+- Noted improvement for the shared composable (left unchanged to avoid cross-project divergence): guard against a null schema in `validate`/`simpleValidate` (currently can throw). Optional: auto-`watch` a schema `Ref`; derive `ZodErrorTree` from `ReturnType<typeof z.treeifyError>`.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 

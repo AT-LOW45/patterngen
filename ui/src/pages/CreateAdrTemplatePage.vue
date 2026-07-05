@@ -21,15 +21,15 @@
 						<i class="pi pi-info-circle text-xs" /> Overview
 					</h2>
 
-					<FormField label="Title" required :error-message="errors.title">
+					<FormField label="Title" required :error-message="validationErrors?.properties?.title?.errors">
 						<InputText v-model="form.title" placeholder="e.g. API authentication strategy" fluid />
 					</FormField>
 
 					<div class="grid grid-cols-2 gap-3">
-						<FormField label="Status" required :error-message="errors.status">
+						<FormField label="Status" required :error-message="validationErrors?.properties?.status?.errors">
 							<Select v-model="form.status" :options="statusOptions" placeholder="Select status" fluid />
 						</FormField>
-						<FormField label="Scope" required :tip="{ message: 'The system or component boundary this applies to.' }" :error-message="errors.scope">
+						<FormField label="Scope" required :tip="{ message: 'The system or component boundary this applies to.' }" :error-message="validationErrors?.properties?.scope?.errors">
 							<InputText v-model="form.scope" placeholder="e.g. Backend API" fluid />
 						</FormField>
 					</div>
@@ -45,7 +45,7 @@
 						<i class="pi pi-lightbulb text-xs" /> Decision
 					</h2>
 
-					<FormField label="Decision" required :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }" :error-message="errors.decision">
+					<FormField label="Decision" required :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }" :error-message="validationErrors?.properties?.decision?.errors">
 						<MdEditor
 							v-model="form.decision"
 							:theme="isDark ? 'dark' : 'light'"
@@ -199,11 +199,13 @@
 <script setup lang="ts">
 import { knowledgeBaseService } from "@/api-service";
 import FormField from "@/components/form/FormField.vue";
+import useZodValidation from "@/composables/useZodValidation";
+import { adrSchema } from "@/schemas/adrSchema";
 import ROUTES from "@/router/routes";
 import type { ToolbarNames } from "md-editor-v3";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import { Button, Chip, InputText, Select, SelectButton, Tag, Textarea, useToast } from "primevue";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -269,7 +271,10 @@ const statusSeverityMap: Record<string, "success" | "info" | "warn" | "secondary
 
 const alternativeInput = ref<string>("");
 const submitting = ref<boolean>(false);
-const errors = ref<Record<string, string>>({});
+
+const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
+	errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
+});
 
 const form = ref<AdrForm>({
 	id: "",
@@ -375,25 +380,15 @@ onMounted(async () => {
 	}
 });
 
-const validate = (): boolean => {
-	const e: Record<string, string> = {};
-	if (!form.value.title.trim()) e.title = "Title is required.";
-	if (!form.value.status) e.status = "Status is required.";
-	if (!form.value.scope.trim()) e.scope = "Scope is required.";
-	if (!form.value.decision.trim()) e.decision = "Decision is required.";
-	errors.value = e;
-	return Object.keys(e).length === 0;
-};
+// After the first failed submit, re-validate live so errors clear as fields are fixed.
+watch(form, () => simpleValidate(form.value), { deep: true });
 
 const saveDraft = (): void => {
 	// TODO: persist draft locally (deferred)
 };
 
 const submitAdr = async (): Promise<void> => {
-	if (!validate()) {
-		toast.add({ severity: "warn", summary: "Missing required fields", detail: "Please complete the highlighted fields.", life: 3000 });
-		return;
-	}
+	if (!validate(form.value)) return;
 
 	submitting.value = true;
 	try {
