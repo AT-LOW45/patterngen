@@ -4,7 +4,7 @@
 		<div class="flex items-end justify-between gap-4">
 			<div class="flex flex-col gap-1">
 				<h1 class="text-xl font-medium text-slate-700 dark:text-surface-100">Create ADR</h1>
-				<p class="text-sm text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
+				<p class=" text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
 				<span class="font-mono text-sm text-slate-400">{{ form.id }}</span>
@@ -93,6 +93,54 @@
 					</FormField>
 				</section>
 
+				<!-- Custom sections -->
+				<section class="flex flex-col gap-4">
+					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
+						<i class="pi pi-plus-circle text-xs" /> Custom sections
+					</h2>
+
+					<div
+						v-for="(section, i) in form.customSections"
+						:key="i"
+						class="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-surface-700 p-4 bg-white"
+					>
+						<div class="flex items-center gap-2">
+							<InputText v-model="section.heading" placeholder="Section heading — e.g. Exception Classes" class="flex-1" />
+							<SelectButton
+								v-model="section.format"
+								:options="formatOptions"
+								option-label="label"
+								option-value="value"
+								:allow-empty="false"
+								size="small"
+							/>
+							<Button icon="pi pi-trash" severity="danger" text aria-label="Remove section" @click="removeCustomSection(i)" />
+						</div>
+
+						<Textarea
+							v-if="section.format === 'plain'"
+							v-model="section.body"
+							placeholder="Section content..."
+							:auto-resize="true"
+							rows="3"
+							fluid
+						/>
+						<MdEditor
+							v-else
+							v-model="section.body"
+							:theme="isDark ? 'dark' : 'light'"
+							:preview="false"
+							:toolbars="mdToolbars"
+							:footers="[]"
+							language="en-US"
+							placeholder="Section content — supports code blocks via the </> button..."
+							style="height: 260px"
+						/>
+					</div>
+
+					<Button label="Add section" icon="pi pi-plus" severity="secondary" outlined class="self-start" @click="addCustomSection" />
+				</section>
+
 				<!-- Consequences -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
@@ -124,7 +172,7 @@
 
 			<!-- RIGHT: live preview (sticky) -->
 			<div class="lg:sticky lg:top-0">
-				<div class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden">
+				<div class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden mt-5">
 					<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800">
 						<i class="pi pi-eye text-slate-400 text-sm" />
 						<span class="text-sm font-medium text-slate-500 dark:text-surface-300">Live preview</span>
@@ -150,10 +198,18 @@
 
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from "vue";
-import { InputText, Textarea, Button, Tag, Chip, Select } from "primevue";
+import { InputText, Textarea, Button, Tag, Chip, Select, SelectButton } from "primevue";
 import { MdPreview, MdEditor } from "md-editor-v3";
 import type { ToolbarNames } from "md-editor-v3";
 import FormField from "@/components/form/FormField.vue";
+
+type SectionFormat = "plain" | "rich";
+
+interface CustomSection {
+	heading: string;
+	body: string;
+	format: SectionFormat;
+}
 
 interface AdrForm {
 	id: string;
@@ -165,10 +221,16 @@ interface AdrForm {
 	alternatives: string[];
 	relatedAdrs: string;
 	implementation: string;
+	customSections: CustomSection[];
 	positiveConsequences: string;
 	negativeConsequences: string;
 	notes: string;
 }
+
+const formatOptions: { label: string; value: SectionFormat }[] = [
+	{ label: "Plain text", value: "plain" },
+	{ label: "Rich text", value: "rich" },
+];
 
 // Focused toolbar for the code-capable sections (Decision, Implementation, Notes).
 // The page's right-hand pane is the preview, so the editor's built-in preview is off.
@@ -211,10 +273,19 @@ const form = ref<AdrForm>({
 	alternatives: [],
 	relatedAdrs: "",
 	implementation: "",
+	customSections: [],
 	positiveConsequences: "",
 	negativeConsequences: "",
 	notes: "",
 });
+
+const addCustomSection = (): void => {
+	form.value.customSections.push({ heading: "", body: "", format: "plain" });
+};
+
+const removeCustomSection = (index: number): void => {
+	form.value.customSections.splice(index, 1);
+};
 
 const statusSeverity = computed(() => statusSeverityMap[form.value.status] ?? "secondary");
 
@@ -248,6 +319,11 @@ const markdown = computed<string>(() => {
 
 	if (f.implementation.trim()) {
 		lines.push("", "## Implementation", f.implementation.trim());
+	}
+
+	for (const s of f.customSections) {
+		if (!s.heading.trim() && !s.body.trim()) continue;
+		lines.push("", `## ${s.heading.trim() || "Untitled Section"}`, s.body.trim());
 	}
 
 	lines.push("", "## Consequences");

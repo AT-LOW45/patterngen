@@ -9,7 +9,7 @@
 		>
 			<h1 v-if="!collapsed" class="m-0 text-2xl font-semibold whitespace-nowrap">Patterngen</h1>
 			<button
-				class="flex items-center justify-center w-9 h-9 rounded-md text-slate-600 hover:bg-slate-200 transition-colors shrink-0"
+				class="flex items-center justify-center w-9 h-9 rounded-md text-slate-600 hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
 				:aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
 				@click="toggle"
 			>
