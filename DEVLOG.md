@@ -56,8 +56,22 @@ Proposed architecture:
 
 MVP: deterministic checks + a single LLM semantic pass returning `{ verdict, findings[] }`, advisory only. Defer the numeric score and deep code judgment.
 
+### Planned feature — configurable ADR formats (idea only, not designed yet)
+Today the ADR format is hardcoded to the author's own (Status/Scope/Context/Decision/Implementation/Consequences). Different teams use different ADR formats, so the system should **understand a team's own format** when indexing and when generating code. Idea: a new page to define/manage their ADR format.
+
+Rough shape / things to figure out later:
+- A format = a set of section definitions (name, required?, description, code-capable?). One source of truth that drives multiple places:
+  - **Create page** — render fields dynamically from the format instead of the hardcoded sections.
+  - **AI quality review** — the "required sections" check reads from the team's format, not a fixed list.
+  - **Indexing** — chunking already splits generically on `##` headers, so arbitrary formats already chunk; the real work is tagging which sections matter (e.g. Decision/Implementation) for retrieval.
+  - **Generation** — the boilerplate prompt should know which sections carry the actionable decisions/code for that team's format.
+- Open questions: scoping (per team / per workspace / per knowledge base?); where the format config lives (backend db/blob/config); migration of existing ADRs; whether formats are picked per-ADR or set once per team.
+- Connects to the existing custom-sections feature on the create page (that's a lightweight, per-ADR version of this).
+
+Not being tackled yet — parked alongside the quality-review feature.
+
 ### What to do next
-- **AI ADR quality review** (see design note above) — new feature the user wants next. Suggested start: deterministic structural checks first (cheap, visible half), then the LLM semantic pass.
+- **Planned features (parked, not started):** (1) AI ADR quality review — suggested start is deterministic structural checks, then the LLM semantic pass; (2) configurable ADR formats per team. See the two design notes above.
 - **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
 - **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit); now more relevant since the auto-id is best-effort and two same-title ADRs collide. Decide whether to warn before overwrite.
 - **Wire `saveDraft`** (deferred) — likely `localStorage` rather than blob, since drafts shouldn't be indexed.
