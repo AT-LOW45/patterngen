@@ -39,6 +39,10 @@ This is the internal engineering journal — for user-facing release notes see [
 - `submitAdr` calls `validate(form.value)` (composable owns the error toast); a `watch(form, simpleValidate, { deep: true })` re-validates live after the first failed submit so errors clear as fields are fixed. `FormField`s bind `validationErrors?.properties?.<field>?.errors`. Verified the treeifyError shape matches the binding path.
 - Noted improvement for the shared composable (left unchanged to avoid cross-project divergence): guard against a null schema in `validate`/`simpleValidate` (currently can throw). Optional: auto-`watch` a schema `Ref`; derive `ZodErrorTree` from `ReturnType<typeof z.treeifyError>`.
 
+### Cleanup — extracted create-page logic into a composable
+- The create page's `<script setup>` had grown to ~200 lines. Moved all state/behaviour into [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) — form state + types, validation, markdown assembly, dark-mode tracking, id fetch, live re-validation, and all actions (`addAlternative`, `add/removeCustomSection`, `saveDraft`, `submitAdr`), plus the static UI config (`statusOptions`, `formatOptions`, `mdToolbars`).
+- [CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) is now template + a single `useCreateAdr()` destructure (~20-line script). Pure extraction — no behaviour change, type-checks clean. Bonus: concentrates ADR-structure logic in one file, which will help when configurable formats land.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 
