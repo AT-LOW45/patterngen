@@ -120,6 +120,12 @@ async def search_index(
     return "\n\n---\n\n".join(_assemble_source(source) for source in relevant)
 
 
+def list_sources() -> list[str]:
+    """All unique source keys currently in the vector store."""
+    results = vector_store.get()
+    return sorted({m.get("source", "") for m in results["metadatas"] if m.get("source")})
+
+
 def delete_from_index(source: str, clear_key: bool = False) -> None:
     """
     clears document from vector store while persisting the record. If clear_key is True, clears the record entirely

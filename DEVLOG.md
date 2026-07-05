@@ -24,6 +24,16 @@ This is the internal engineering journal — for user-facing release notes see [
 ### Live preview scroll fix
 - The preview pane wasn't scrolling — content past a certain point was clipped. Root cause: `md-editor`'s root is `height: 100%`, but the card had no bounded height, so the preview grew unbounded and `max-h` just clipped it. Fixed by making the preview card a `flex flex-col` bounded to `max-h-[calc(100vh-...)]`, with a `shrink-0` header and the preview as a `flex-1 min-h-0 overflow-y-auto` child so it scrolls internally while the card stays sticky.
 
+### Cleanup — source generation moved to backend
+- The frontend was slugifying the `source` key itself before submitting. Moved that logic server-side: `slugify` + `generate_source` in [knowledge_base_service.py](rag/service/knowledge_base_service.py) derive the key from the document's first `# ` H1 (which carries the id, e.g. `# ADR-003: …`).
+- New `POST /knowledge-base` create endpoint derives the source, indexes, and returns `{ source, result }` (400 if no H1). `index-document` (explicit source) still serves the edit/reindex path.
+- Frontend: removed the `slugify` helper; `submitAdr` calls the new `createDocument(content)` and uses the backend-returned source. `saveMarkdown` kept for edits. Resulting slug is unchanged — only where it's computed.
+
+### Cleanup — auto-assigned ADR id
+- The create form hardcoded `ADR-003`. Now the backend assigns it: `list_sources()` ([chroma_helper.py](rag/db/chroma_helper.py)) + `next_adr_id()` ([knowledge_base_service.py](rag/service/knowledge_base_service.py)) scan existing `adr-NNN` source prefixes and return max+1 (zero-padded), exposed via `GET /knowledge-base/next-id` (declared before `/{source}` so the static path wins).
+- Frontend fetches it on mount; header shows "Assigning ID…" and **Create** is disabled until the id arrives; on fetch failure it stays disabled (avoids overwriting an existing id). Verified: with adr-001/002/003 indexed, next id = `ADR-004`.
+- Known caveat: best-effort, not a reservation — concurrent creates could get the same id (ties into the overwrite-guard item).
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 
@@ -43,9 +53,8 @@ MVP: deterministic checks + a single LLM semantic pass returning `{ verdict, fin
 
 ### What to do next
 - **AI ADR quality review** (see design note above) — new feature the user wants next. Suggested start: deterministic structural checks first (cheap, visible half), then the LLM semantic pass.
-- **Verify the create flow end-to-end** against a running backend: confirm a created ADR lands in blob storage, appears in the knowledge base list, and is retrievable. (In progress — user testing in the UI.)
-- **Auto-assign the ADR id** — it's hardcoded to `ADR-003` in the create form. Needs a backend way to get the next id, else creating a second ADR collides on the displayed id.
-- **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit). Decide whether to warn.
+- **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
+- **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit); now more relevant since the auto-id is best-effort and two same-title ADRs collide. Decide whether to warn before overwrite.
 - **Wire `saveDraft`** (deferred) — likely `localStorage` rather than blob, since drafts shouldn't be indexed.
 - **Git hygiene** — `rag/chroma_db/` and `rag/record_manager.db` are tracked and churn binary diffs every commit; `.gitignore` + `git rm --cached` them.
 - **Lower-priority backlog** — persist sidebar collapsed state (localStorage); backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).

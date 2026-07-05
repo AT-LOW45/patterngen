@@ -7,7 +7,7 @@
 				<p class=" text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				<span class="font-mono text-sm text-slate-400">{{ form.id }}</span>
+				<span class="font-mono text-sm text-slate-400">{{ form.id || "Assigning ID…" }}</span>
 				<Tag v-if="form.status" :value="form.status" :severity="statusSeverity" />
 			</div>
 		</div>
@@ -176,7 +176,7 @@
 					<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800 shrink-0">
 						<i class="pi pi-eye text-slate-400 text-sm" />
 						<span class="text-sm font-medium text-slate-500 dark:text-surface-300">Live preview</span>
-						<span class="ml-auto text-xs text-slate-400">{{ form.id }}.md</span>
+						<span class="ml-auto text-xs text-slate-400">{{ form.id || "adr" }}.md</span>
 					</div>
 					<MdPreview
 						:model-value="markdown"
@@ -191,7 +191,7 @@
 		<!-- Actions -->
 		<div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-surface-800">
 			<Button label="Save draft" severity="secondary" icon="pi pi-save" :disabled="submitting" @click="saveDraft" />
-			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" @click="submitAdr" />
+			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" :disabled="!form.id" @click="submitAdr" />
 		</div>
 	</div>
 </template>
@@ -203,7 +203,7 @@ import ROUTES from "@/router/routes";
 import type { ToolbarNames } from "md-editor-v3";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import { Button, Chip, InputText, Select, SelectButton, Tag, Textarea, useToast } from "primevue";
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -272,7 +272,7 @@ const submitting = ref<boolean>(false);
 const errors = ref<Record<string, string>>({});
 
 const form = ref<AdrForm>({
-	id: "ADR-003",
+	id: "",
 	status: "",
 	title: "",
 	scope: "",
@@ -312,7 +312,8 @@ const markdown = computed<string>(() => {
 	const f = form.value;
 	const lines: string[] = [];
 
-	lines.push(`# ${f.id}: ${f.title || "Untitled ADR"}`, "");
+	const title = f.title || "Untitled ADR";
+	lines.push(f.id ? `# ${f.id}: ${title}` : `# ${title}`, "");
 	lines.push("## Status", f.status || "_Not set_", "");
 	lines.push("## Scope", f.scope || "_Not set_", "");
 	lines.push("## Context", f.context || "_Describe the situation and why a decision was needed._", "");
@@ -363,14 +364,16 @@ observer.observe(document.documentElement, { attributes: true, attributeFilter: 
 observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 onBeforeUnmount(() => observer.disconnect());
 
-// Derive the record's unique key (blob object key + vector-store source id) from
-// the ADR id and title, e.g. "ADR-003" + "API auth strategy" -> "adr-003-api-auth-strategy".
-const slugify = (value: string): string =>
-	value
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
+// The backend assigns the next sequential id; fetch it to pre-fill the header/H1.
+onMounted(async () => {
+	try {
+		const { data } = await knowledgeBaseService.getNextId();
+		form.value.id = data.id;
+	} catch (error) {
+		console.error("Failed to fetch next ADR id:", error);
+		toast.add({ severity: "error", summary: "Couldn't assign an ADR id", detail: "Reload to try again.", life: 4000 });
+	}
+});
 
 const validate = (): boolean => {
 	const e: Record<string, string> = {};
@@ -392,11 +395,10 @@ const submitAdr = async (): Promise<void> => {
 		return;
 	}
 
-	const source = slugify(`${form.value.id}-${form.value.title}`);
 	submitting.value = true;
 	try {
-		await knowledgeBaseService.saveMarkdown(source, markdown.value);
-		toast.add({ severity: "success", summary: "ADR created", detail: source, life: 3000 });
+		const { data } = await knowledgeBaseService.createDocument(markdown.value);
+		toast.add({ severity: "success", summary: "ADR created", detail: data.source, life: 3000 });
 		router.push(ROUTES.knowledgeBase);
 	} catch (error) {
 		console.error("Failed to create ADR:", error);

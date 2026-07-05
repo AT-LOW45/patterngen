@@ -21,9 +21,15 @@ export const knowledgeBaseService = {
 		});
 	},
 
-	// Persist a markdown string under `source` — used for both creating a new
-	// record and re-indexing an edited one. The backend writes it to blob storage
-	// and (re)indexes it into the vector store.
+	// Next sequential ADR id to pre-fill the create form (e.g. "ADR-004").
+	getNextId: () => api.get<{ id: string }>("/knowledge-base/next-id"),
+
+	// Create a new record from markdown. The backend derives the source key from
+	// the document's H1 title and returns it, then writes to blob + indexes.
+	createDocument: (content: string) => api.post<{ source: string }>("/knowledge-base", { content }),
+
+	// Persist a markdown string under a known `source` — used for re-indexing an
+	// edited record (stable identity). The backend writes to blob + re-indexes.
 	saveMarkdown: (source: string, content: string) => {
 		const blob = new Blob([content], { type: "text/markdown" });
 		const file = new File([blob], source, { type: "text/markdown" });

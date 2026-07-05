@@ -10,3 +10,7 @@ class GenerateBoilerplateRequest(BaseModel):
 class IndexDocumentRequest(BaseModel):
     content: str
     source: str
+
+
+class CreateDocumentRequest(BaseModel):
+    content: str
