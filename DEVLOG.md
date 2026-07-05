@@ -24,7 +24,25 @@ This is the internal engineering journal — for user-facing release notes see [
 ### Live preview scroll fix
 - The preview pane wasn't scrolling — content past a certain point was clipped. Root cause: `md-editor`'s root is `height: 100%`, but the card had no bounded height, so the preview grew unbounded and `max-h` just clipped it. Fixed by making the preview card a `flex flex-col` bounded to `max-h-[calc(100vh-...)]`, with a `shrink-0` header and the preview as a `flex-1 min-h-0 overflow-y-auto` child so it scrolls internally while the card stays sticky.
 
+### Planned feature — AI ADR quality review (design, not built)
+Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
+
+Key design decisions from the discussion:
+- **Split the checks by nature — don't LLM everything:**
+  - *Deterministic (plain code, no LLM):* missing required sections (parse `##` headers for Title/Scope/Decision/etc.), word-count / length limit, malformed/unclosed code fences. Cheap, instant, reliable, free.
+  - *Semantic (LLM earns its keep):* off-topic/irrelevant text, incoherent or self-contradictory decisions, code-sample plausibility. Scope "bad code" narrowly → syntactic plausibility + matches the stated language, NOT deep code-quality opinions.
+- **Advisory, never blocking** — flag issues, let the user "Submit anyway". Consistent with recommend-not-require.
+- **No numeric score** — it implies false precision and LLMs aren't stable scorers. Emit a coarse verdict (Good / Needs work / Poor) + a findings list `{ severity, section, message }`.
+- **Applies to create AND upload** — the create form already enforces structure; the real value is the upload path (arbitrary `.md`) and free-text/custom sections.
+
+Proposed architecture:
+- New endpoint `POST /knowledge-base/review` — takes markdown, runs deterministic checks + one Groq call (reuse `config/llm_config.py`) with **structured JSON output**, returns `{ verdict, findings[], wordCount, missingSections[] }`. Findings are ephemeral (not persisted).
+- Frontend: a "Check quality" action (and/or run on Create) → findings dialog → **Fix** or **Submit anyway**.
+
+MVP: deterministic checks + a single LLM semantic pass returning `{ verdict, findings[] }`, advisory only. Defer the numeric score and deep code judgment.
+
 ### What to do next
+- **AI ADR quality review** (see design note above) — new feature the user wants next. Suggested start: deterministic structural checks first (cheap, visible half), then the LLM semantic pass.
 - **Verify the create flow end-to-end** against a running backend: confirm a created ADR lands in blob storage, appears in the knowledge base list, and is retrievable. (In progress — user testing in the UI.)
 - **Auto-assign the ADR id** — it's hardcoded to `ADR-003` in the create form. Needs a backend way to get the next id, else creating a second ADR collides on the displayed id.
 - **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit). Decide whether to warn.
