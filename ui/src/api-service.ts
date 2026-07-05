@@ -21,7 +21,10 @@ export const knowledgeBaseService = {
 		});
 	},
 
-	reindexRecord: (source: string, content: string) => {
+	// Persist a markdown string under `source` — used for both creating a new
+	// record and re-indexing an edited one. The backend writes it to blob storage
+	// and (re)indexes it into the vector store.
+	saveMarkdown: (source: string, content: string) => {
 		const blob = new Blob([content], { type: "text/markdown" });
 		const file = new File([blob], source, { type: "text/markdown" });
 		const form = new FormData();

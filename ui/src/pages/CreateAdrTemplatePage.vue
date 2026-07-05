@@ -21,15 +21,15 @@
 						<i class="pi pi-info-circle text-xs" /> Overview
 					</h2>
 
-					<FormField label="Title" required>
+					<FormField label="Title" required :error-message="errors.title">
 						<InputText v-model="form.title" placeholder="e.g. API authentication strategy" fluid />
 					</FormField>
 
 					<div class="grid grid-cols-2 gap-3">
-						<FormField label="Status" required>
+						<FormField label="Status" required :error-message="errors.status">
 							<Select v-model="form.status" :options="statusOptions" placeholder="Select status" fluid />
 						</FormField>
-						<FormField label="Scope" required :tip="{ message: 'The system or component boundary this applies to.' }">
+						<FormField label="Scope" required :tip="{ message: 'The system or component boundary this applies to.' }" :error-message="errors.scope">
 							<InputText v-model="form.scope" placeholder="e.g. Backend API" fluid />
 						</FormField>
 					</div>
@@ -45,7 +45,7 @@
 						<i class="pi pi-lightbulb text-xs" /> Decision
 					</h2>
 
-					<FormField label="Decision" required :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }">
+					<FormField label="Decision" required :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }" :error-message="errors.decision">
 						<MdEditor
 							v-model="form.decision"
 							:theme="isDark ? 'dark' : 'light'"
@@ -171,9 +171,9 @@
 			</div>
 
 			<!-- RIGHT: live preview (sticky) -->
-			<div class="lg:sticky lg:top-0">
-				<div class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden mt-5">
-					<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800">
+			<div class="lg:sticky lg:top-5">
+				<div class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden flex flex-col max-h-[calc(100vh-5.5rem)]">
+					<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800 shrink-0">
 						<i class="pi pi-eye text-slate-400 text-sm" />
 						<span class="text-sm font-medium text-slate-500 dark:text-surface-300">Live preview</span>
 						<span class="ml-auto text-xs text-slate-400">{{ form.id }}.md</span>
@@ -182,7 +182,7 @@
 						:model-value="markdown"
 						:theme="isDark ? 'dark' : 'light'"
 						language="en-US"
-						class="max-h-[calc(100vh-13rem)] overflow-y-auto px-5"
+						class="flex-1 min-h-0 overflow-y-auto px-5"
 					/>
 				</div>
 			</div>
@@ -190,18 +190,24 @@
 
 		<!-- Actions -->
 		<div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-surface-800">
-			<Button label="Save draft" severity="secondary" icon="pi pi-save" @click="saveDraft" />
-			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" @click="submitAdr" />
+			<Button label="Save draft" severity="secondary" icon="pi pi-save" :disabled="submitting" @click="saveDraft" />
+			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" @click="submitAdr" />
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount } from "vue";
-import { InputText, Textarea, Button, Tag, Chip, Select, SelectButton } from "primevue";
-import { MdPreview, MdEditor } from "md-editor-v3";
-import type { ToolbarNames } from "md-editor-v3";
+import { knowledgeBaseService } from "@/api-service";
 import FormField from "@/components/form/FormField.vue";
+import ROUTES from "@/router/routes";
+import type { ToolbarNames } from "md-editor-v3";
+import { MdEditor, MdPreview } from "md-editor-v3";
+import { Button, Chip, InputText, Select, SelectButton, Tag, Textarea, useToast } from "primevue";
+import { computed, onBeforeUnmount, ref } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const toast = useToast();
 
 type SectionFormat = "plain" | "rich";
 
@@ -262,6 +268,8 @@ const statusSeverityMap: Record<string, "success" | "info" | "warn" | "secondary
 };
 
 const alternativeInput = ref<string>("");
+const submitting = ref<boolean>(false);
+const errors = ref<Record<string, string>>({});
 
 const form = ref<AdrForm>({
 	id: "ADR-003",
@@ -355,11 +363,46 @@ observer.observe(document.documentElement, { attributes: true, attributeFilter: 
 observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 onBeforeUnmount(() => observer.disconnect());
 
-const saveDraft = (): void => {
-	// TODO: persist draft (not yet wired to backend)
+// Derive the record's unique key (blob object key + vector-store source id) from
+// the ADR id and title, e.g. "ADR-003" + "API auth strategy" -> "adr-003-api-auth-strategy".
+const slugify = (value: string): string =>
+	value
+		.toLowerCase()
+		.trim()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+
+const validate = (): boolean => {
+	const e: Record<string, string> = {};
+	if (!form.value.title.trim()) e.title = "Title is required.";
+	if (!form.value.status) e.status = "Status is required.";
+	if (!form.value.scope.trim()) e.scope = "Scope is required.";
+	if (!form.value.decision.trim()) e.decision = "Decision is required.";
+	errors.value = e;
+	return Object.keys(e).length === 0;
 };
 
-const submitAdr = (): void => {
-	// TODO: POST assembled markdown to the backend index-document endpoint
+const saveDraft = (): void => {
+	// TODO: persist draft locally (deferred)
+};
+
+const submitAdr = async (): Promise<void> => {
+	if (!validate()) {
+		toast.add({ severity: "warn", summary: "Missing required fields", detail: "Please complete the highlighted fields.", life: 3000 });
+		return;
+	}
+
+	const source = slugify(`${form.value.id}-${form.value.title}`);
+	submitting.value = true;
+	try {
+		await knowledgeBaseService.saveMarkdown(source, markdown.value);
+		toast.add({ severity: "success", summary: "ADR created", detail: source, life: 3000 });
+		router.push(ROUTES.knowledgeBase);
+	} catch (error) {
+		console.error("Failed to create ADR:", error);
+		toast.add({ severity: "error", summary: "Failed to create ADR", life: 3000 });
+	} finally {
+		submitting.value = false;
+	}
 };
 </script>

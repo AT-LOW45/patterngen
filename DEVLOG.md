@@ -5,6 +5,33 @@ This is the internal engineering journal — for user-facing release notes see [
 
 ---
 
+## 2026-07-05
+
+### Create ADR page — full redesign
+- Reworked [ui/src/pages/CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) from a 4-step wizard into a **form + live markdown preview** split. All fields now use the shared `FormField` component; the right pane renders the assembled ADR (via `MdPreview`) live, in the same format as `docs/adr/`.
+- **Code-capable sections:** Decision, a new Implementation section, and Notes use `md-editor-v3`'s `MdEditor` (trimmed toolbar, editor-only since the page has its own preview). Context/Consequences stay plain Textareas.
+- **Custom sections:** users can add their own sections with a heading, body, and a per-section Plain-text / Rich-text toggle (`SelectButton`). Flows into the doc as `## {heading}`.
+- **Design decision:** structured form for *create* (guided on-ramp for people unfamiliar with markdown); the *edit* page stays a single markdown editor. Format is a recommendation, not a requirement — arbitrary markdown still flows through upload + edit.
+
+### Create ADR — persistence wired (no backend changes)
+- `submitAdr` now assembles the fields into markdown, derives a `source` slug from id + title, and POSTs via `knowledgeBaseService.saveMarkdown` to the existing `/knowledge-base/index-document` endpoint — which already writes to blob storage + indexes. Added required-field validation (inline `FormField` errors + toast), loading state, and redirect to the list on success.
+- Renamed `api-service` `reindexRecord` → `saveMarkdown` (serves both create and edit); updated the edit-page call site.
+- Not yet verified against a running backend. `saveDraft` deferred.
+
+### Collapsible sidebar
+- Added a `useSidebar` composable (module-level shared `collapsed` ref, default collapsed). [Sidebar.vue](ui/src/components/layout/Sidebar.vue) animates w-16 ↔ w-64 with icon-only + tooltips when collapsed; [AppLayout.vue](ui/src/components/layout/AppLayout.vue) shifts content margin in step. In-memory only (resets on reload).
+
+### Live preview scroll fix
+- The preview pane wasn't scrolling — content past a certain point was clipped. Root cause: `md-editor`'s root is `height: 100%`, but the card had no bounded height, so the preview grew unbounded and `max-h` just clipped it. Fixed by making the preview card a `flex flex-col` bounded to `max-h-[calc(100vh-...)]`, with a `shrink-0` header and the preview as a `flex-1 min-h-0 overflow-y-auto` child so it scrolls internally while the card stays sticky.
+
+### What to do next
+- **Verify the create flow end-to-end** against a running backend: confirm a created ADR lands in blob storage, appears in the knowledge base list, and is retrievable. (In progress — user testing in the UI.)
+- **Auto-assign the ADR id** — it's hardcoded to `ADR-003` in the create form. Needs a backend way to get the next id, else creating a second ADR collides on the displayed id.
+- **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit). Decide whether to warn.
+- **Wire `saveDraft`** (deferred) — likely `localStorage` rather than blob, since drafts shouldn't be indexed.
+- **Git hygiene** — `rag/chroma_db/` and `rag/record_manager.db` are tracked and churn binary diffs every commit; `.gitignore` + `git rm --cached` them.
+- **Lower-priority backlog** — persist sidebar collapsed state (localStorage); backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).
+
 ## 2026-06-21
 
 ### Boilerplate generation — template crash fix

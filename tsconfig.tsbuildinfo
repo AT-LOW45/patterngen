@@ -1,0 +1,1 @@
+{"root":["./src/extension.ts","./src/commands/generate-boilerplate.ts","./src/commands/open-knowledge-base.ts","./src/commands/wrap-in-try-catch.ts","./src/config/api-config.ts","./src/constants/commands.ts","./src/service/boilerplate.service.ts","./src/test/extension.test.ts"],"errors":true,"version":"6.0.3"}

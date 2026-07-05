@@ -10,3 +10,7 @@ body {
 	color: #4b5563;
 	background-color: #f9fafc;
 }
+
+#md-editor-v-16-preview {
+	overflow-y: auto !important;
+}

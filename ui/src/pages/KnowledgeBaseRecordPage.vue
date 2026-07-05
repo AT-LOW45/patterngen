@@ -1,5 +1,5 @@
 <template>
-	<div class="w-full flex items-center p-2 rounded-xl bg-white shadow-md mx-auto 2xl:max-w-[80%] sticky top-0 z-50">
+	<div class="w-full flex items-center p-2 rounded-xl bg-white shadow-md mx-auto 2xl:max-w-[90%] sticky top-0 z-50">
 		<Button
 			label="Prev"
 			icon="pi pi-arrow-left"
@@ -30,7 +30,7 @@
 		/>
 	</div>
 
-	<div class="w-full 2xl:mx-auto 2xl:max-w-[80%] mt-4">
+	<div class="w-full 2xl:mx-auto 2xl:max-w-[90%] mt-4">
 		<div v-if="isLoadingRecord" class="p-4 text-center text-gray-500">Loading record...</div>
 		<div v-else-if="recordData" class="bg-white rounded-lg shadow-md p-6">
 			<div class="flex items-center justify-between mb-4">
@@ -141,7 +141,7 @@ const onRecordSelected = () => {
 const onSave = async () => {
 	saving.value = true;
 	try {
-		await knowledgeBaseService.reindexRecord(currentRecord.value, editorText.value);
+		await knowledgeBaseService.saveMarkdown(currentRecord.value, editorText.value);
 		toast.add({ severity: "success", summary: "Record reindexed", life: 3000 });
 	} catch (error) {
 		console.error("Failed to reindex record:", error);
