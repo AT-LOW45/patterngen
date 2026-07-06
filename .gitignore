@@ -6,8 +6,10 @@ node_modules
 .env
 
 .venv/
-uv.lock
 .vscode/settings.json
+
+# Stray misplaced virtualenv — the real backend is rag/
+src/rag/
 
 __pycache__/
 *.pyc

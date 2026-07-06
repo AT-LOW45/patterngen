@@ -1,0 +1,3 @@
+# Keep the uv lockfile byte-identical across Windows and macOS so switching
+# machines doesn't produce spurious CRLF/LF diffs.
+uv.lock text eol=lf
