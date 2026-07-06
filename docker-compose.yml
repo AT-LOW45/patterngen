@@ -1,0 +1,50 @@
+# Local MinIO (S3-compatible) blob storage for patterngen.
+# Credentials and bucket name are read from the repo-root .env (not hardcoded),
+# so no secrets live in this committed file:
+#   BLOB_ACCESS_KEY  -> MinIO root user
+#   BLOB_SECRET_KEY  -> MinIO root password
+#   BLOB_BUCKET      -> bucket created on startup
+#
+# Usage:
+#   docker compose up -d      # start MinIO + create the bucket
+#   docker compose down       # stop (data persists in the named volume)
+#   docker compose down -v    # stop and wipe stored objects
+#
+# S3 API:      http://localhost:9000   (matches BLOB_ENDPOINT)
+# Web console: http://localhost:9001   (log in with BLOB_ACCESS_KEY / BLOB_SECRET_KEY)
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: patterngen-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${BLOB_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${BLOB_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  # One-shot: waits for MinIO, then creates the bucket if it doesn't exist.
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      BLOB_ACCESS_KEY: ${BLOB_ACCESS_KEY}
+      BLOB_SECRET_KEY: ${BLOB_SECRET_KEY}
+      BLOB_BUCKET: ${BLOB_BUCKET}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $${BLOB_ACCESS_KEY} $${BLOB_SECRET_KEY}; do
+        echo 'waiting for minio...'; sleep 1;
+      done;
+      mc mb --ignore-existing local/$${BLOB_BUCKET};
+      echo 'bucket ready: '$${BLOB_BUCKET};
+      "
+
+volumes:
+  minio-data:
