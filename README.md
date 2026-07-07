@@ -37,7 +37,7 @@ The Vue app is built to `ui/dist` and served by FastAPI at `/`, so the backend a
 - **Python ≥ 3.13** and [`uv`](https://docs.astral.sh/uv/)
 - **Node.js** (for the Vue knowledge-base UI)
 - An **LLM API key** — Groq is the current default; the provider is configurable (see [llm_config.py](rag/config/llm_config.py))
-- An **S3-compatible blob store** (for persisting raw ADR content)
+- An **S3-compatible blob store** (for persisting raw ADR content) — for local development, use the bundled [MinIO](https://min.io/) setup, which only requires **Docker** (see step 2)
 
 ## Setup
 
@@ -48,13 +48,35 @@ Create a `.env` at the repo root (the `GROQ_API_KEY` below reflects the current 
 ```env
 GROQ_API_KEY=your_groq_key
 API_ENDPOINT=http://localhost:8000
-BLOB_ENDPOINT=https://your-s3-endpoint
+BLOB_ENDPOINT=http://localhost:9000
 BLOB_ACCESS_KEY=...
 BLOB_SECRET_KEY=...
 BLOB_BUCKET=patterngen-docs
 ```
 
-### 2. Build the knowledge-base UI
+> The `BLOB_*` values are also consumed by the bundled MinIO setup (step 2): `BLOB_ACCESS_KEY`/`BLOB_SECRET_KEY` become MinIO's root credentials and `BLOB_BUCKET` is the bucket it creates. Use `http://localhost:9000` for `BLOB_ENDPOINT` when running MinIO locally. If you point at a managed S3-compatible store instead, set these to that store's values and skip step 2. Note: MinIO requires the access key to be **≥ 3 characters** and the secret key **≥ 8 characters**, or the container won't start.
+
+### 2. Start the blob storage (MinIO via Docker)
+
+The repo includes a [docker-compose.yml](docker-compose.yml) that runs a local MinIO server and creates the `BLOB_BUCKET` on startup. It reads credentials and the bucket name from the repo-root `.env` (step 1), so no secrets are hardcoded.
+
+```bash
+docker compose up -d      # start MinIO and create the bucket (pulls images on first run)
+```
+
+- **S3 API:** `http://localhost:9000` (matches `BLOB_ENDPOINT`)
+- **Web console:** `http://localhost:9001` — log in with `BLOB_ACCESS_KEY` / `BLOB_SECRET_KEY` to browse stored ADRs
+
+Objects persist in the `minio-data` Docker volume across restarts. Other commands:
+
+```bash
+docker compose down       # stop (data is preserved)
+docker compose down -v    # stop and delete all stored objects
+```
+
+Skip this step if you're using a managed S3-compatible store; just point the `BLOB_*` values in `.env` at it.
+
+### 3. Build the knowledge-base UI
 
 ```bash
 cd ui
@@ -64,7 +86,7 @@ npm run build        # outputs to ui/dist, served by the backend
 
 > `ui/.env` should set `VITE_API_ENDPOINT=http://localhost:8000` (same origin as the backend). Rebuild after changing it. For UI development with hot-reload, run `npm run dev` (Vite on :5173) instead.
 
-### 3. Run the backend
+### 4. Run the backend
 
 ```bash
 cd rag
@@ -73,7 +95,7 @@ uv run python main.py    # FastAPI on http://localhost:8000 (reload enabled)
 
 The knowledge-base UI is now available at `http://localhost:8000`.
 
-### 4. Run the extension
+### 5. Run the extension
 
 Open the repo in VS Code and press **F5** to launch an Extension Development Host with Patterngen loaded.
 
