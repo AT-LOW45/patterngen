@@ -13,3 +13,8 @@ src/rag/
 
 __pycache__/
 *.pyc
+
+# Regenerable RAG artifacts — the vector store index and its dedup record manager.
+# Rebuilt per-environment by (re)indexing ADRs; should not be tracked/synced via git.
+rag/chroma_db/
+rag/record_manager.db
