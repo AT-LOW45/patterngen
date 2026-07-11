@@ -1,8 +1,10 @@
 import { useToast } from "primevue/usetoast";
 import { Ref, ref, unref } from "vue";
-import { ZodTypeAny, z } from "zod/v4";
+import { z } from "zod/v4";
 
-export type ZodErrorTree<T extends z.ZodTypeAny> = {
+// `z.ZodType` is the modern base type for "any schema" — `ZodTypeAny` was moved to
+// zod's deprecated `compat` shim in v4.
+export type ZodErrorTree<T extends z.ZodType> = {
 	errors: string[];
 	properties?: {
 		[K in keyof z.infer<T>]?: { errors: string[] };
@@ -11,7 +13,7 @@ export type ZodErrorTree<T extends z.ZodTypeAny> = {
 
 type ErrorToast = { errorToast: Pick<Parameters<ReturnType<typeof useToast>["add"]>[0], "detail" | "summary"> };
 
-const useZodValidation = <T extends ZodTypeAny>(schemaParam: T | Ref<T>, toastData?: ErrorToast) => {
+const useZodValidation = <T extends z.ZodType>(schemaParam: T | Ref<T>, toastData?: ErrorToast) => {
 	const toast = useToast();
 
 	// initialize to `null` so the ref type is `ZodErrorTree<T> | null` (not undefined)
@@ -22,7 +24,12 @@ const useZodValidation = <T extends ZodTypeAny>(schemaParam: T | Ref<T>, toastDa
 	const updateSchema = (newSchema: T) => (currentSchema.value = newSchema);
 
 	const simpleValidate = (validationObject: unknown) => {
-		const result = currentSchema.value.safeParse(validationObject);
+		const schema = currentSchema.value;
+		if (!schema) {
+			return;
+		}
+
+		const result = schema.safeParse(validationObject);
 
 		if (!result.success) {
 			const errors = z.treeifyError(result.error);
@@ -36,7 +43,12 @@ const useZodValidation = <T extends ZodTypeAny>(schemaParam: T | Ref<T>, toastDa
 	};
 
 	const validate = (validationObject: unknown): boolean => {
-		const result = currentSchema.value.safeParse(validationObject);
+		const schema = currentSchema.value;
+		if (!schema) {
+			return true; // nothing to validate against
+		}
+
+		const result = schema.safeParse(validationObject);
 
 		if (!result.success) {
 			hasSubmittedOnceWithErrors.value = true;

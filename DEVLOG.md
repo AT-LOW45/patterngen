@@ -49,6 +49,11 @@ This is the internal engineering journal — for user-facing release notes see [
 - [knowledge_base.py](rag/router/knowledge_base.py) now imports only from `service` (+ exception/fastapi/schema) — verified no `db.`/`storage.` imports. Exception→404 mapping stays in the controller (HTTP concern). Handlers renamed to `*_endpoint`.
 - Also gave the draft router a [draft_service.py](rag/service/draft_service.py) (owns the JSON (de)serialization; router just passes dicts). Verified **all three routers** (knowledge_base, draft, boilerplate) are now free of direct `db.`/`storage.` imports — layering consistent end to end.
 
+### Cleanup — useZodValidation composable
+- Replaced the deprecated `ZodTypeAny` (only present in zod v4's `compat` shim: `export { ZodType as ZodTypeAny }`) with the modern **`z.ZodType`** base type, in both the `ZodErrorTree` constraint and the composable generic.
+- Added a **null-schema guard** to `validate`/`simpleValidate` (capture `currentSchema.value` to a const, bail early — `validate` returns `true`, `simpleValidate` no-ops), removing the latent NPE and giving clean TS narrowing. Type-checks + lints clean.
+- Note: this composable is shared across the user's projects — both fixes are worth backporting.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 
