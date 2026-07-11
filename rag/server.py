@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from router import boilerplate, knowledge_base
+from router import boilerplate, knowledge_base, draft
 
 app = FastAPI()
 
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(draft.router)
 app.include_router(knowledge_base.router)
 app.include_router(boilerplate.router)
 

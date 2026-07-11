@@ -43,6 +43,12 @@ This is the internal engineering journal — for user-facing release notes see [
 - The create page's `<script setup>` had grown to ~200 lines. Moved all state/behaviour into [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) — form state + types, validation, markdown assembly, dark-mode tracking, id fetch, live re-validation, and all actions (`addAlternative`, `add/removeCustomSection`, `saveDraft`, `submitAdr`), plus the static UI config (`statusOptions`, `formatOptions`, `mdToolbars`).
 - [CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) is now template + a single `useCreateAdr()` destructure (~20-line script). Pure extraction — no behaviour change, type-checks clean. Bonus: concentrates ADR-structure logic in one file, which will help when configurable formats land.
 
+### Cleanup — enforce router → service → db/storage layering
+- The `knowledge_base` router was calling `chroma_helper` (db) and `blob_storage` (storage) directly, and even orchestrated two-store deletes in the controller — breaking the layering stated in CLAUDE.md.
+- Moved it behind the service: added `list_documents`, `get_document_raw`, `get_document_chunks`, `delete_document`, `clear_documents` to [knowledge_base_service.py](rag/service/knowledge_base_service.py) (delete/clear now own the vector-store + blob orchestration), plus a `get_chunks` helper in [chroma_helper.py](rag/db/chroma_helper.py) to keep db access in the db layer.
+- [knowledge_base.py](rag/router/knowledge_base.py) now imports only from `service` (+ exception/fastapi/schema) — verified no `db.`/`storage.` imports. Exception→404 mapping stays in the controller (HTTP concern). Handlers renamed to `*_endpoint`.
+- Also gave the draft router a [draft_service.py](rag/service/draft_service.py) (owns the JSON (de)serialization; router just passes dicts). Verified **all three routers** (knowledge_base, draft, boilerplate) are now free of direct `db.`/`storage.` imports — layering consistent end to end.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 

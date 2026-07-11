@@ -1,14 +1,16 @@
-from db.chroma_helper import delete_from_index
 from exception.document_not_found_error import DocumentNotFoundError
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException, UploadFile, File, APIRouter
-from db.chroma_helper import vector_store
 from schema.boilerplate_schema import CreateDocumentRequest
-from storage.blob_storage import delete_from_blob, get_from_blob
 from service.knowledge_base_service import (
     index_document as kb_index_document,
     generate_source,
     next_adr_id,
+    list_documents,
+    get_document_raw,
+    get_document_chunks,
+    delete_document,
+    clear_documents,
 )
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
@@ -52,32 +54,22 @@ async def next_id_endpoint():
 
 
 @router.get("/{source}/raw")
-async def get_document_raw(source: str):
+async def get_document_raw_endpoint(source: str):
     try:
-        content = get_from_blob(source)
+        content = get_document_raw(source)
     except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail=f"Document '{source}' not found")
     return JSONResponse(content={"source": source, "content": content})
 
 
 @router.get("")
-async def get_knowledge_base():
-    results = vector_store.get()
-
-    # extract unique sources from metadata
-    sources = list(
-        set(metadata.get("source", "unknown") for metadata in results["metadatas"])
-    )
-
-    return JSONResponse(content={"sources": sources})
+async def list_documents_endpoint():
+    return JSONResponse(content={"sources": list_documents()})
 
 
 @router.get("/{source}")
-async def get_document_content(source: str):
-    results = vector_store.get(where={"source": source})
-
-    chunks = results["documents"]
-
+async def get_document_content_endpoint(source: str):
+    chunks = get_document_chunks(source)
     return JSONResponse(
         content={"source": source, "chunks": chunks, "chunk_count": len(chunks)}
     )
@@ -85,20 +77,10 @@ async def get_document_content(source: str):
 
 @router.delete("/{source}")
 async def delete_document_endpoint(source: str):
-    delete_from_index(source, True)
-    delete_from_blob(source)
+    delete_document(source)
     return JSONResponse(content={"deleted": source})
 
 
 @router.delete("")
-async def clear_knowledge_base():
-    results = vector_store.get()
-    sources = list(
-        set(metadata.get("source", "unknown") for metadata in results["metadatas"])
-    )
-
-    for source in sources:
-        delete_from_index(source, True)
-        delete_from_blob(source)
-
-    return JSONResponse(content={"deleted": sources})
+async def clear_knowledge_base_endpoint():
+    return JSONResponse(content={"deleted": clear_documents()})

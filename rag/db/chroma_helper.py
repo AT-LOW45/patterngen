@@ -126,6 +126,12 @@ def list_sources() -> list[str]:
     return sorted({m.get("source", "") for m in results["metadatas"] if m.get("source")})
 
 
+def get_chunks(source: str) -> list[str]:
+    """All stored chunk texts for one source."""
+    results = vector_store.get(where={"source": source})
+    return results["documents"]
+
+
 def delete_from_index(source: str, clear_key: bool = False) -> None:
     """
     clears document from vector store while persisting the record. If clear_key is True, clears the record entirely
