@@ -12,6 +12,12 @@
 				</template>
 
 				<Column field="name" header="Record Name"></Column>
+				<Column header="Type">
+					<template #body="{ data }">
+						<Tag v-if="data.isDraft" value="Draft" severity="warn" />
+						<span v-else class="text-sm text-slate-400">Published</span>
+					</template>
+				</Column>
 				<Column header="Actions">
 					<template #body="{ data }">
 						<div class="flex items-center justify-start gap-2">
@@ -82,16 +88,18 @@
 </template>
 
 <script setup lang="ts">
-import { knowledgeBaseService } from "@/api-service";
+import { knowledgeBaseService, draftService } from "@/api-service";
 import FormField from "@/components/form/FormField.vue";
 import ROUTES from "@/router/routes";
-import { Button, Column, DataTable, Dialog, FileUpload, InputText, Menu, Message, useConfirm, useToast } from "primevue";
+import { Button, Column, DataTable, Dialog, FileUpload, InputText, Menu, Message, Tag, useConfirm, useToast } from "primevue";
 import { MenuItem } from "primevue/menuitem";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 interface KnowledgeBaseRecord {
 	name: string;
+	isDraft: boolean;
+	draftId?: string;
 }
 
 const confirm = useConfirm();
@@ -134,10 +142,19 @@ const fetchRecords = async () => {
 	loading.value = true;
 	error.value = null;
 	try {
-		const response = await knowledgeBaseService.getAllRecords();
-		records.value = response.data.sources.map((source: string) => ({
-			name: source,
+		const [published, drafts] = await Promise.all([knowledgeBaseService.getAllRecords(), draftService.listDrafts()]);
+
+		const draftRows: KnowledgeBaseRecord[] = drafts.data.drafts.map((d) => ({
+			name: d.draft.title?.trim() || d.id,
+			isDraft: true,
+			draftId: d.id,
 		}));
+		const publishedRows: KnowledgeBaseRecord[] = published.data.sources.map((source: string) => ({
+			name: source,
+			isDraft: false,
+		}));
+
+		records.value = [...draftRows, ...publishedRows];
 	} catch (err) {
 		error.value = err instanceof Error ? err.message : "Failed to fetch records";
 	} finally {
@@ -146,9 +163,14 @@ const fetchRecords = async () => {
 };
 
 const onRowClick = (event: any) => {
-	selectedRecord.value = event.data;
-	router.push({ name: "KnowledgeBaseRecord", params: { id: event.data.name } });
-	// drawerVisible.value = true;
+	const row = event.data as KnowledgeBaseRecord;
+	selectedRecord.value = row;
+	if (row.isDraft && row.draftId) {
+		// resume the draft in the create page
+		router.push({ path: ROUTES.knowledgeBaseCreate, query: { draft: row.draftId } });
+	} else {
+		router.push({ name: "KnowledgeBaseRecord", params: { id: row.name } });
+	}
 };
 
 const onDelete = (record: KnowledgeBaseRecord) => {
@@ -164,7 +186,11 @@ const onDelete = (record: KnowledgeBaseRecord) => {
 			loading.value = true;
 			error.value = null;
 			try {
-				await knowledgeBaseService.deleteRecord(record.name);
+				if (record.isDraft && record.draftId) {
+					await draftService.deleteDraft(record.draftId);
+				} else {
+					await knowledgeBaseService.deleteRecord(record.name);
+				}
 				fetchRecords();
 			} catch (err) {
 				error.value = err instanceof Error ? err.message : "Failed to delete record";

@@ -1,11 +1,11 @@
-import { knowledgeBaseService } from "@/api-service";
+import { knowledgeBaseService, draftService } from "@/api-service";
 import { adrSchema } from "@/schemas/adrSchema";
 import useZodValidation from "@/composables/useZodValidation";
 import ROUTES from "@/router/routes";
 import type { ToolbarNames } from "md-editor-v3";
 import { useToast } from "primevue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 export type SectionFormat = "plain" | "rich";
 
@@ -89,11 +89,15 @@ function emptyForm(): AdrForm {
  */
 export function useCreateAdr() {
 	const router = useRouter();
+	const route = useRoute();
 	const toast = useToast();
 
 	const form = ref<AdrForm>(emptyForm());
 	const alternativeInput = ref<string>("");
 	const submitting = ref<boolean>(false);
+	const savingDraft = ref<boolean>(false);
+	// The draft this session maps to. Null until the first save; set when resuming an existing draft.
+	const draftId = ref<string | null>(null);
 
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
@@ -176,8 +180,23 @@ export function useCreateAdr() {
 	observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 	onBeforeUnmount(() => observer.disconnect());
 
-	// The backend assigns the next sequential id; fetch it to pre-fill the header/H1.
+	// Resume an existing draft when ?draft=<id> is present; otherwise start fresh with
+	// a backend-assigned next id.
 	onMounted(async () => {
+		const resumeId = typeof route.query.draft === "string" ? route.query.draft : null;
+		if (resumeId) {
+			try {
+				const { data } = await draftService.getDraft(resumeId);
+				form.value = { ...emptyForm(), ...data.draft };
+				draftId.value = resumeId;
+				return;
+			} catch (error) {
+				console.error("Failed to load draft:", error);
+				toast.add({ severity: "error", summary: "Couldn't load draft", detail: "Starting a new ADR instead.", life: 4000 });
+				// fall through to a fresh id so the page stays usable
+			}
+		}
+
 		try {
 			const { data } = await knowledgeBaseService.getNextId();
 			form.value.id = data.id;
@@ -190,8 +209,22 @@ export function useCreateAdr() {
 	// After the first failed submit, re-validate live so errors clear as fields are fixed.
 	watch(form, () => simpleValidate(form.value), { deep: true });
 
-	const saveDraft = (): void => {
-		// TODO: persist draft locally (deferred)
+	const saveDraft = async (): Promise<void> => {
+		// New drafts get a stable id on first save (independent of the ADR id);
+		// saving again overwrites the same draft.
+		if (!draftId.value) {
+			draftId.value = crypto.randomUUID();
+		}
+		savingDraft.value = true;
+		try {
+			await draftService.saveDraft(draftId.value, form.value);
+			toast.add({ severity: "success", summary: "Draft saved", life: 2000 });
+		} catch (error) {
+			console.error("Failed to save draft:", error);
+			toast.add({ severity: "error", summary: "Failed to save draft", life: 3000 });
+		} finally {
+			savingDraft.value = false;
+		}
 	};
 
 	const submitAdr = async (): Promise<void> => {
@@ -200,6 +233,18 @@ export function useCreateAdr() {
 		submitting.value = true;
 		try {
 			const { data } = await knowledgeBaseService.createDocument(markdown.value);
+
+			// Publishing consumes the draft — remove it so it no longer shows in the list.
+			// Best-effort: the ADR is already created, so a cleanup failure shouldn't fail the publish.
+			if (draftId.value) {
+				try {
+					await draftService.deleteDraft(draftId.value);
+				} catch (error) {
+					console.error("Failed to remove draft after publish:", error);
+				}
+				draftId.value = null;
+			}
+
 			toast.add({ severity: "success", summary: "ADR created", detail: data.source, life: 3000 });
 			router.push(ROUTES.knowledgeBase);
 		} catch (error) {
@@ -215,6 +260,7 @@ export function useCreateAdr() {
 		form,
 		alternativeInput,
 		submitting,
+		savingDraft,
 		validationErrors,
 		// derived
 		statusSeverity,

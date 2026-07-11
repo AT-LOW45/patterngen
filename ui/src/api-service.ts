@@ -1,3 +1,4 @@
+import type { AdrForm } from "@/composables/useCreateAdr";
 import axios, { CreateAxiosDefaults } from "axios";
 
 const axiosConfig: CreateAxiosDefaults = {
@@ -39,4 +40,13 @@ export const knowledgeBaseService = {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},
+} as const;
+
+// Drafts — in-progress ADRs stored as the form object (JSON), never indexed.
+// Kept separate from knowledgeBaseService, mirroring the backend's dedicated draft service.
+export const draftService = {
+	listDrafts: () => api.get<{ drafts: { id: string; draft: AdrForm }[] }>("/knowledge-base/drafts"),
+	getDraft: (id: string) => api.get<{ id: string; draft: AdrForm }>(`/knowledge-base/drafts/${encodeURIComponent(id)}`),
+	saveDraft: (id: string, draft: AdrForm) => api.put(`/knowledge-base/drafts/${encodeURIComponent(id)}`, draft),
+	deleteDraft: (id: string) => api.delete(`/knowledge-base/drafts/${encodeURIComponent(id)}`),
 } as const;

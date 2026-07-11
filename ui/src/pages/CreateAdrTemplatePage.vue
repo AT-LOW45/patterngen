@@ -188,9 +188,11 @@
 			</div>
 		</div>
 
-		<!-- Actions -->
-		<div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-surface-800">
-			<Button label="Save draft" severity="secondary" icon="pi pi-save" :disabled="submitting" @click="saveDraft" />
+		<!-- Actions (sticky so they're reachable without scrolling to the bottom) -->
+		<div
+			class="sticky bottom-0 z-10 -mx-5 flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-100/95 px-5 py-3 backdrop-blur dark:border-surface-800 dark:bg-surface-900/95"
+		>
+			<Button label="Save draft" severity="secondary" icon="pi pi-save" :loading="savingDraft" :disabled="submitting" @click="saveDraft" />
 			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" :disabled="!form.id" @click="submitAdr" />
 		</div>
 	</div>
@@ -206,6 +208,7 @@ const {
 	form,
 	alternativeInput,
 	submitting,
+	savingDraft,
 	validationErrors,
 	statusSeverity,
 	markdown,

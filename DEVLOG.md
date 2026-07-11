@@ -54,6 +54,13 @@ This is the internal engineering journal — for user-facing release notes see [
 - Added a **null-schema guard** to `validate`/`simpleValidate` (capture `currentSchema.value` to a const, bail early — `validate` returns `true`, `simpleValidate` no-ops), removing the latent NPE and giving clean TS narrowing. Type-checks + lints clean.
 - Note: this composable is shared across the user's projects — both fixes are worth backporting.
 
+### Draft support (single overwritable version per draft) — end to end
+- **Backend:** drafts stored as opaque form JSON at `drafts/<id>.json` in blob storage (never indexed). Dedicated [router/draft.py](rag/router/draft.py) (`/knowledge-base/drafts`) → [draft_service.py](rag/service/draft_service.py) (owns JSON (de)serialization) → blob helpers. CRUD: list, `PUT/GET/DELETE /{id}`. Included before `knowledge_base` router so it wins over `/{source}`.
+- **Frontend:** separate `draftService` object in [api-service.ts](ui/src/api-service.ts) (mirrors the backend split). [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) tracks a `draftId` (UUID generated on first save, independent of the ADR id since next-id isn't reserved). Resume via `?draft=<id>` (loads on mount); saving overwrites the same id.
+- **Publish consumes the draft:** after a successful create, `deleteDraft(draftId)` removes it from storage so it drops out of the list (best-effort — a cleanup failure doesn't fail the already-created ADR).
+- **List page** ([KnowledgeBaseListPage.vue](ui/src/pages/KnowledgeBaseListPage.vue)) merges drafts with published ADRs, adds a **Type** column (Draft tag vs "Published"), resumes drafts on row-click, and routes delete to the right service.
+- Type-checks clean. Not yet exercised against a running MinIO — needs a live round-trip check.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 
@@ -89,7 +96,7 @@ Not being tackled yet — parked alongside the quality-review feature.
 - **Planned features (parked, not started):** (1) AI ADR quality review — suggested start is deterministic structural checks, then the LLM semantic pass; (2) configurable ADR formats per team. See the two design notes above.
 - **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
 - **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit); now more relevant since the auto-id is best-effort and two same-title ADRs collide. Decide whether to warn before overwrite.
-- **Wire `saveDraft`** (deferred) — likely `localStorage` rather than blob, since drafts shouldn't be indexed.
+- **Test the draft flow against MinIO** — save → resume → publish (draft deleted) → delete-from-list, end to end.
 - **Git hygiene** — `rag/chroma_db/` and `rag/record_manager.db` are tracked and churn binary diffs every commit; `.gitignore` + `git rm --cached` them.
 - **Lower-priority backlog** — persist sidebar collapsed state (localStorage); backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).
 
