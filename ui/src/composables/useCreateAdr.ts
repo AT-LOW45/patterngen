@@ -5,7 +5,7 @@ import ROUTES from "@/router/routes";
 import type { ToolbarNames } from "md-editor-v3";
 import { useToast } from "primevue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 
 export type SectionFormat = "plain" | "rich";
 
@@ -99,6 +99,19 @@ export function useCreateAdr() {
 	// The draft this session maps to. Null until the first save; set when resuming an existing draft.
 	const draftId = ref<string | null>(null);
 
+	// Baseline snapshot of the form (JSON) representing the last persisted/loaded state.
+	// The form is "dirty" (has unsaved progress) when it no longer matches this.
+	const savedSnapshot = ref<string>("");
+	const markPristine = (): void => {
+		savedSnapshot.value = JSON.stringify(form.value);
+	};
+	const isDirty = computed<boolean>(() => JSON.stringify(form.value) !== savedSnapshot.value);
+
+	// Unsaved-changes dialog state (shown when navigating away while dirty).
+	const showLeaveDialog = ref<boolean>(false);
+	const pendingRoute = ref<string | null>(null);
+	const bypassLeaveGuard = ref<boolean>(false); // set for our own post-publish navigation
+
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
 	});
@@ -180,23 +193,7 @@ export function useCreateAdr() {
 	observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 	onBeforeUnmount(() => observer.disconnect());
 
-	// Resume an existing draft when ?draft=<id> is present; otherwise start fresh with
-	// a backend-assigned next id.
-	onMounted(async () => {
-		const resumeId = typeof route.query.draft === "string" ? route.query.draft : null;
-		if (resumeId) {
-			try {
-				const { data } = await draftService.getDraft(resumeId);
-				form.value = { ...emptyForm(), ...data.draft };
-				draftId.value = resumeId;
-				return;
-			} catch (error) {
-				console.error("Failed to load draft:", error);
-				toast.add({ severity: "error", summary: "Couldn't load draft", detail: "Starting a new ADR instead.", life: 4000 });
-				// fall through to a fresh id so the page stays usable
-			}
-		}
-
+	const assignNewId = async (): Promise<void> => {
 		try {
 			const { data } = await knowledgeBaseService.getNextId();
 			form.value.id = data.id;
@@ -204,12 +201,80 @@ export function useCreateAdr() {
 			console.error("Failed to fetch next ADR id:", error);
 			toast.add({ severity: "error", summary: "Couldn't assign an ADR id", detail: "Reload to try again.", life: 4000 });
 		}
+	};
+
+	// Resume an existing draft when ?draft=<id> is present; otherwise start fresh with
+	// a backend-assigned next id. Snapshot the result as the pristine baseline.
+	onMounted(async () => {
+		const resumeId = typeof route.query.draft === "string" ? route.query.draft : null;
+		if (resumeId) {
+			try {
+				const { data } = await draftService.getDraft(resumeId);
+				form.value = { ...emptyForm(), ...data.draft };
+				draftId.value = resumeId;
+			} catch (error) {
+				console.error("Failed to load draft:", error);
+				toast.add({ severity: "error", summary: "Couldn't load draft", detail: "Starting a new ADR instead.", life: 4000 });
+				await assignNewId();
+			}
+		} else {
+			await assignNewId();
+		}
+		markPristine();
 	});
+
+	// Warn on browser-level navigation (tab close / refresh) while there are unsaved changes.
+	const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+		if (isDirty.value) {
+			event.preventDefault();
+			event.returnValue = "";
+		}
+	};
+	window.addEventListener("beforeunload", handleBeforeUnload);
+	onBeforeUnmount(() => window.removeEventListener("beforeunload", handleBeforeUnload));
+
+	// Intercept in-app navigation while dirty and show the unsaved-changes dialog instead.
+	onBeforeRouteLeave((to) => {
+		if (bypassLeaveGuard.value || !isDirty.value) {
+			return true;
+		}
+		pendingRoute.value = to.fullPath;
+		showLeaveDialog.value = true;
+		return false;
+	});
+
+	const cancelLeave = (): void => {
+		showLeaveDialog.value = false;
+		pendingRoute.value = null;
+	};
+
+	const discardAndLeave = (): void => {
+		showLeaveDialog.value = false;
+		const target = pendingRoute.value;
+		pendingRoute.value = null;
+		bypassLeaveGuard.value = true; // allow the blocked navigation to proceed unsaved
+		if (target) {
+			router.push(target);
+		}
+	};
+
+	const saveDraftAndLeave = async (): Promise<void> => {
+		const ok = await saveDraft();
+		if (!ok) {
+			return; // save failed — keep the dialog open so they can retry or cancel
+		}
+		showLeaveDialog.value = false;
+		const target = pendingRoute.value;
+		pendingRoute.value = null;
+		if (target) {
+			router.push(target); // form is pristine now, so the guard allows it
+		}
+	};
 
 	// After the first failed submit, re-validate live so errors clear as fields are fixed.
 	watch(form, () => simpleValidate(form.value), { deep: true });
 
-	const saveDraft = async (): Promise<void> => {
+	const saveDraft = async (): Promise<boolean> => {
 		// New drafts get a stable id on first save (independent of the ADR id);
 		// saving again overwrites the same draft.
 		if (!draftId.value) {
@@ -218,10 +283,13 @@ export function useCreateAdr() {
 		savingDraft.value = true;
 		try {
 			await draftService.saveDraft(draftId.value, form.value);
+			markPristine();
 			toast.add({ severity: "success", summary: "Draft saved", life: 2000 });
+			return true;
 		} catch (error) {
 			console.error("Failed to save draft:", error);
 			toast.add({ severity: "error", summary: "Failed to save draft", life: 3000 });
+			return false;
 		} finally {
 			savingDraft.value = false;
 		}
@@ -246,6 +314,7 @@ export function useCreateAdr() {
 			}
 
 			toast.add({ severity: "success", summary: "ADR created", detail: data.source, life: 3000 });
+			bypassLeaveGuard.value = true; // our own navigation — skip the unsaved-changes guard
 			router.push(ROUTES.knowledgeBase);
 		} catch (error) {
 			console.error("Failed to create ADR:", error);
@@ -262,6 +331,11 @@ export function useCreateAdr() {
 		submitting,
 		savingDraft,
 		validationErrors,
+		// unsaved-changes dialog
+		showLeaveDialog,
+		cancelLeave,
+		discardAndLeave,
+		saveDraftAndLeave,
 		// derived
 		statusSeverity,
 		markdown,

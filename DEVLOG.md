@@ -61,6 +61,12 @@ This is the internal engineering journal — for user-facing release notes see [
 - **List page** ([KnowledgeBaseListPage.vue](ui/src/pages/KnowledgeBaseListPage.vue)) merges drafts with published ADRs, adds a **Type** column (Draft tag vs "Published"), resumes drafts on row-click, and routes delete to the right service.
 - Type-checks clean. Not yet exercised against a running MinIO — needs a live round-trip check.
 
+### Create page — unsaved-changes guard
+- Added dirty-tracking + a leave warning to [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts): snapshots the form as a pristine baseline after load (new id / resumed draft) and after each save; `isDirty` = form ≠ baseline.
+- `onBeforeRouteLeave` blocks in-app navigation while dirty and shows a modal ([CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue)) warning that leaving discards progress, with **Save as draft** (saves → proceeds) and **Cancel** (stays). A `beforeunload` listener covers tab-close/refresh via the native prompt. Publish sets a bypass flag so creating an ADR doesn't trigger the warning.
+- Interpretation: warns only when there's actual unsaved content — a pristine, untouched new form (just the auto-assigned id) does not warn.
+- Dialog has three actions: **Leave without saving** (discards, proceeds via the bypass flag), **Cancel** (stays), **Save as draft** (saves → proceeds).
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 

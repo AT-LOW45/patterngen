@@ -195,6 +195,22 @@
 			<Button label="Save draft" severity="secondary" icon="pi pi-save" :loading="savingDraft" :disabled="submitting" @click="saveDraft" />
 			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" :disabled="!form.id" @click="submitAdr" />
 		</div>
+
+		<!-- Unsaved-changes warning shown when navigating away with unsaved progress -->
+		<Dialog v-model:visible="showLeaveDialog" header="Unsaved changes" :modal="true" :closable="false" :style="{ width: '460px' }">
+			<p class="text-slate-600 dark:text-surface-300">
+				Leaving this page will discard your unsaved progress. Would you like to save it as a draft first?
+			</p>
+			<template #footer>
+				<div class="flex w-full items-center justify-between">
+					<Button label="Leave without saving" severity="danger" text @click="discardAndLeave" />
+					<div class="flex gap-2">
+						<Button label="Cancel" severity="secondary" text @click="cancelLeave" />
+						<Button label="Save as draft" icon="pi pi-save" :loading="savingDraft" @click="saveDraftAndLeave" />
+					</div>
+				</div>
+			</template>
+		</Dialog>
 	</div>
 </template>
 
@@ -202,7 +218,7 @@
 import FormField from "@/components/form/FormField.vue";
 import { useCreateAdr } from "@/composables/useCreateAdr";
 import { MdEditor, MdPreview } from "md-editor-v3";
-import { Button, Chip, InputText, Select, SelectButton, Tag, Textarea } from "primevue";
+import { Button, Chip, Dialog, InputText, Select, SelectButton, Tag, Textarea } from "primevue";
 
 const {
 	form,
@@ -221,5 +237,9 @@ const {
 	removeCustomSection,
 	saveDraft,
 	submitAdr,
+	showLeaveDialog,
+	cancelLeave,
+	discardAndLeave,
+	saveDraftAndLeave,
 } = useCreateAdr();
 </script>
