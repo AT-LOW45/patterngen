@@ -67,6 +67,17 @@ This is the internal engineering journal — for user-facing release notes see [
 - Interpretation: warns only when there's actual unsaved content — a pristine, untouched new form (just the auto-assigned id) does not warn.
 - Dialog has three actions: **Leave without saving** (discards, proceeds via the bypass flag), **Cancel** (stays), **Save as draft** (saves → proceeds).
 
+### Cleanup — untracked regenerable RAG artifacts (git hygiene)
+- `rag/chroma_db/` (vector store) and `rag/record_manager.db` (dedup record manager) were tracked in git, churning binary diffs into every commit and effectively syncing a vector DB through git. Added them to [.gitignore](.gitignore) and `git rm --cached`'d them (kept on disk). Commit `4518dcd`; working tree no longer churns.
+- **Cross-device note:** these are now per-device. On the other device's next pull, git removes its tracked copies — either back them up + restore after pull (keep the index, no reindex), or let them go and reindex. They're a matched pair (`chroma_db` + `record_manager.db`) — always rebuild/copy both together or incremental dedup breaks.
+
+### Planned feature — multi-device sync without hosted services (Option A, deferred)
+Blob (MinIO) runs in a per-device Docker volume and `chroma_db` is now per-device, so nothing syncs across the user's two machines except `docs/adr/*.md` (git-tracked). Goal: keep the workflow in sync with no cloud/hosted storage.
+- **Principle:** sync the *source* (small ADR markdown via git), rebuild the *derived* stores (blob + vector index) locally per device. The git untracking above is the foundation (derived binaries out of git).
+- **Chosen direction (Option A):** make `docs/adr/*.md` the git-synced source of truth. Two pieces to build: (1) the create flow writes created ADRs into `docs/adr/` (not just blob); (2) a **reindex-from-`docs/adr`** command/endpoint each device runs after pulling to rebuild its local `chroma_db` + repopulate MinIO. (That reindex-from-source command is also the keystone for general multi-device consistency.)
+- **Alternatives considered:** Syncthing (P2P file sync, no cloud) for a folder of ADR markdown; or manual export/import scripts (blob ⇄ files). For a zero-hosted git remote, a LAN/USB git remote works.
+- Deferred — user will tackle later.
+
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
 
@@ -103,7 +114,7 @@ Not being tackled yet — parked alongside the quality-review feature.
 - **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
 - **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit); now more relevant since the auto-id is best-effort and two same-title ADRs collide. Decide whether to warn before overwrite.
 - **Test the draft flow against MinIO** — save → resume → publish (draft deleted) → delete-from-list, end to end.
-- **Git hygiene** — `rag/chroma_db/` and `rag/record_manager.db` are tracked and churn binary diffs every commit; `.gitignore` + `git rm --cached` them.
+- **Multi-device sync (Option A, parked)** — see design note above: write created ADRs into `docs/adr/`, add a reindex-from-source command. User will tackle later.
 - **Lower-priority backlog** — persist sidebar collapsed state (localStorage); backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).
 
 ## 2026-06-21
