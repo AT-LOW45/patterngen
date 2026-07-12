@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi import HTTPException, UploadFile, File, APIRouter
 from schema.boilerplate_schema import CreateDocumentRequest
 from service.knowledge_base_service import (
+    source_exist,
     index_document as kb_index_document,
     generate_source,
     next_adr_id,
@@ -25,6 +26,14 @@ async def create_document_endpoint(request: CreateDocumentRequest):
         raise HTTPException(
             status_code=400,
             detail="Could not derive a source: the document needs a top-level '# ' title.",
+        )
+
+    has_conflict = source_exist(source)
+
+    if has_conflict:
+        raise HTTPException(
+            status_code=409,
+            detail="ADR with this title already exists, try using another one",
         )
 
     result = await kb_index_document(request.content, source)

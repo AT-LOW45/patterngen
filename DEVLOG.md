@@ -71,6 +71,11 @@ This is the internal engineering journal — for user-facing release notes see [
 - `rag/chroma_db/` (vector store) and `rag/record_manager.db` (dedup record manager) were tracked in git, churning binary diffs into every commit and effectively syncing a vector DB through git. Added them to [.gitignore](.gitignore) and `git rm --cached`'d them (kept on disk). Commit `4518dcd`; working tree no longer churns.
 - **Cross-device note:** these are now per-device. On the other device's next pull, git removes its tracked copies — either back them up + restore after pull (keep the index, no reindex), or let them go and reindex. They're a matched pair (`chroma_db` + `record_manager.db`) — always rebuild/copy both together or incremental dedup breaks.
 
+### Overwrite guard on create (title-based, non-destructive)
+- Create was destructive: `create_document_endpoint` indexed unconditionally, and `index_document` overwrites via `upload_to_blob` (put_object) + `add_to_index` (`cleanup="incremental"`) — so two ADRs whose H1s slug to the same key silently clobbered each other.
+- Guard added in [knowledge_base_service.py](rag/service/knowledge_base_service.py): `_title_slug` strips the `adr-<n>-` id prefix and `source_exist` compares **title slugs** (so the auto-incremented id is ignored — same title + different id is still caught). The create endpoint returns **409** with a detail message instead of overwriting; user must change the title (no overwrite path, by design). Edit/reindex endpoint untouched (overwrite is correct there).
+- Frontend: `submitAdr` reads `error.response?.data?.detail` (via `axios.isAxiosError`) and shows it in the error toast; on 409 the draft is preserved and there's no navigation, so the user can rename and retry. Verified against real data: same-title/diff-id → conflict; new title → allowed.
+
 ### Planned feature — multi-device sync without hosted services (Option A, deferred)
 Blob (MinIO) runs in a per-device Docker volume and `chroma_db` is now per-device, so nothing syncs across the user's two machines except `docs/adr/*.md` (git-tracked). Goal: keep the workflow in sync with no cloud/hosted storage.
 - **Principle:** sync the *source* (small ADR markdown via git), rebuild the *derived* stores (blob + vector index) locally per device. The git untracking above is the foundation (derived binaries out of git).
@@ -112,7 +117,6 @@ Not being tackled yet — parked alongside the quality-review feature.
 ### What to do next
 - **Planned features (parked, not started):** (1) AI ADR quality review — suggested start is deterministic structural checks, then the LLM semantic pass; (2) configurable ADR formats per team. See the two design notes above.
 - **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
-- **Overwrite guard** — creating with an existing `source` silently reindexes/replaces it (same as edit); now more relevant since the auto-id is best-effort and two same-title ADRs collide. Decide whether to warn before overwrite.
 - **Test the draft flow against MinIO** — save → resume → publish (draft deleted) → delete-from-list, end to end.
 - **Multi-device sync (Option A, parked)** — see design note above: write created ADRs into `docs/adr/`, add a reindex-from-source command. User will tackle later.
 - **Lower-priority backlog** — persist sidebar collapsed state (localStorage); backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).

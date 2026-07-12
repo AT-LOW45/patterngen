@@ -6,6 +6,7 @@ import type { ToolbarNames } from "md-editor-v3";
 import { useToast } from "primevue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import axios from "axios";
 
 export type SectionFormat = "plain" | "rich";
 
@@ -316,9 +317,9 @@ export function useCreateAdr() {
 			toast.add({ severity: "success", summary: "ADR created", detail: data.source, life: 3000 });
 			bypassLeaveGuard.value = true; // our own navigation — skip the unsaved-changes guard
 			router.push(ROUTES.knowledgeBase);
-		} catch (error) {
-			console.error("Failed to create ADR:", error);
-			toast.add({ severity: "error", summary: "Failed to create ADR", life: 3000 });
+		} catch (error: any) {
+			const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+			toast.add({ severity: "error", summary: "Failed to create ADR", life: 3000, detail: detail });
 		} finally {
 			submitting.value = false;
 		}

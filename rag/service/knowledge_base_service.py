@@ -24,6 +24,16 @@ def slugify(value: str) -> str:
     return value.strip("-")
 
 
+def _title_slug(source: str) -> str:
+    """Source key with the leading 'adr-<n>-' id prefix removed, so titles compare regardless of id."""
+    return re.sub(r"^adr-\d+-", "", source)
+
+
+def source_exist(source: str) -> bool:
+    target = _title_slug(source)
+    return any(_title_slug(existing) == target for existing in list_sources())
+
+
 def generate_source(content: str) -> str:
     """
     Derive a stable source key from the document's first H1 heading.
