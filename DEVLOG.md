@@ -1,47 +1,39 @@
 # Dev Log
 
-A dated, chronological record of development work on Patterngen. Newest entries first.
+A dated, chronological record of development work on Patterngen. Newest day first; entries within a day are grouped by topic.
 This is the internal engineering journal — for user-facing release notes see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## 2026-07-05
+## 2026-07-12
 
-### Create ADR page — full redesign
-- Reworked [ui/src/pages/CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) from a 4-step wizard into a **form + live markdown preview** split. All fields now use the shared `FormField` component; the right pane renders the assembled ADR (via `MdPreview`) live, in the same format as `docs/adr/`.
-- **Code-capable sections:** Decision, a new Implementation section, and Notes use `md-editor-v3`'s `MdEditor` (trimmed toolbar, editor-only since the page has its own preview). Context/Consequences stay plain Textareas.
-- **Custom sections:** users can add their own sections with a heading, body, and a per-section Plain-text / Rich-text toggle (`SelectButton`). Flows into the doc as `## {heading}`.
-- **Design decision:** structured form for *create* (guided on-ramp for people unfamiliar with markdown); the *edit* page stays a single markdown editor. Format is a recommendation, not a requirement — arbitrary markdown still flows through upload + edit.
+### Overwrite guard on create (title-based, non-destructive)
+- Create was destructive: `create_document_endpoint` indexed unconditionally, and `index_document` overwrites via `upload_to_blob` (put_object) + `add_to_index` (`cleanup="incremental"`) — so two ADRs whose H1s slug to the same key silently clobbered each other.
+- Guard added in [knowledge_base_service.py](rag/service/knowledge_base_service.py): `_title_slug` strips the `adr-<n>-` id prefix and `source_exist` compares **title slugs** (so the auto-incremented id is ignored — same title + different id is still caught). The create endpoint returns **409** with a detail message instead of overwriting; user must change the title (no overwrite path, by design). Edit/reindex endpoint untouched (overwrite is correct there).
+- Frontend: `submitAdr` reads `error.response?.data?.detail` (via `axios.isAxiosError`) and shows it in the error toast; on 409 the draft is preserved and there's no navigation, so the user can rename and retry. Verified against real data: same-title/diff-id → conflict; new title → allowed.
 
-### Create ADR — persistence wired (no backend changes)
-- `submitAdr` now assembles the fields into markdown, derives a `source` slug from id + title, and POSTs via `knowledgeBaseService.saveMarkdown` to the existing `/knowledge-base/index-document` endpoint — which already writes to blob storage + indexes. Added required-field validation (inline `FormField` errors + toast), loading state, and redirect to the list on success.
-- Renamed `api-service` `reindexRecord` → `saveMarkdown` (serves both create and edit); updated the edit-page call site.
-- Not yet verified against a running backend. `saveDraft` deferred.
+### Sidebar collapsed state persisted
+- Swapped the in-memory `collapsed` ref in [useSidebar.ts](ui/src/composables/useSidebar.ts) for `@vueuse/core`'s `useStorage` (key `patterngen:sidebar-collapsed`, default collapsed). Persists across reloads; still a module-level singleton so Sidebar + AppLayout stay in sync. No component changes needed.
 
-### Collapsible sidebar
-- Added a `useSidebar` composable (module-level shared `collapsed` ref, default collapsed). [Sidebar.vue](ui/src/components/layout/Sidebar.vue) animates w-16 ↔ w-64 with icon-only + tooltips when collapsed; [AppLayout.vue](ui/src/components/layout/AppLayout.vue) shifts content margin in step. In-memory only (resets on reload).
+### What to do next
+- **Planned features (parked, not started):** (1) AI ADR quality review — suggested start is deterministic structural checks, then the LLM semantic pass; (2) configurable ADR formats per team. See the two design notes under 2026-07-11 / 2026-07-05.
+- **Multi-device sync (Option A, parked)** — see design note under 2026-07-11: write created ADRs into `docs/adr/`, add a reindex-from-source command. User will tackle later.
+- **Lower-priority backlog** — backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).
+- Create / draft / overwrite-guard / unsaved-changes flows verified in the UI against the live stack (2026-07-12).
 
-### Live preview scroll fix
-- The preview pane wasn't scrolling — content past a certain point was clipped. Root cause: `md-editor`'s root is `height: 100%`, but the card had no bounded height, so the preview grew unbounded and `max-h` just clipped it. Fixed by making the preview card a `flex flex-col` bounded to `max-h-[calc(100vh-...)]`, with a `shrink-0` header and the preview as a `flex-1 min-h-0 overflow-y-auto` child so it scrolls internally while the card stays sticky.
+## 2026-07-11
 
-### Cleanup — source generation moved to backend
-- The frontend was slugifying the `source` key itself before submitting. Moved that logic server-side: `slugify` + `generate_source` in [knowledge_base_service.py](rag/service/knowledge_base_service.py) derive the key from the document's first `# ` H1 (which carries the id, e.g. `# ADR-003: …`).
-- New `POST /knowledge-base` create endpoint derives the source, indexes, and returns `{ source, result }` (400 if no H1). `index-document` (explicit source) still serves the edit/reindex path.
-- Frontend: removed the `slugify` helper; `submitAdr` calls the new `createDocument(content)` and uses the backend-returned source. `saveMarkdown` kept for edits. Resulting slug is unchanged — only where it's computed.
+### Draft support (single overwritable version per draft) — end to end
+- **Backend:** drafts stored as opaque form JSON at `drafts/<id>.json` in blob storage (never indexed). Dedicated [router/draft.py](rag/router/draft.py) (`/knowledge-base/drafts`) → [draft_service.py](rag/service/draft_service.py) (owns JSON (de)serialization) → blob helpers. CRUD: list, `PUT/GET/DELETE /{id}`. Included before `knowledge_base` router so it wins over `/{source}`.
+- **Frontend:** separate `draftService` object in [api-service.ts](ui/src/api-service.ts) (mirrors the backend split). [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) tracks a `draftId` (UUID generated on first save, independent of the ADR id since next-id isn't reserved). Resume via `?draft=<id>` (loads on mount); saving overwrites the same id.
+- **Publish consumes the draft:** after a successful create, `deleteDraft(draftId)` removes it from storage so it drops out of the list (best-effort — a cleanup failure doesn't fail the already-created ADR).
+- **List page** ([KnowledgeBaseListPage.vue](ui/src/pages/KnowledgeBaseListPage.vue)) merges drafts with published ADRs, adds a **Type** column (Draft tag vs "Published"), resumes drafts on row-click, and routes delete to the right service.
 
-### Cleanup — auto-assigned ADR id
-- The create form hardcoded `ADR-003`. Now the backend assigns it: `list_sources()` ([chroma_helper.py](rag/db/chroma_helper.py)) + `next_adr_id()` ([knowledge_base_service.py](rag/service/knowledge_base_service.py)) scan existing `adr-NNN` source prefixes and return max+1 (zero-padded), exposed via `GET /knowledge-base/next-id` (declared before `/{source}` so the static path wins).
-- Frontend fetches it on mount; header shows "Assigning ID…" and **Create** is disabled until the id arrives; on fetch failure it stays disabled (avoids overwriting an existing id). Verified: with adr-001/002/003 indexed, next id = `ADR-004`.
-- Known caveat: best-effort, not a reservation — concurrent creates could get the same id (ties into the overwrite-guard item).
-
-### Cleanup — form validation via zod composable
-- Replaced the create page's hand-rolled `validate()` + `errors` ref with the reusable `useZodValidation` composable ([ui/src/composables/useZodValidation.ts](ui/src/composables/useZodValidation.ts)) driven by a new [adrSchema.ts](ui/src/schemas/adrSchema.ts) (title/status/scope/decision required; extra form keys ignored).
-- `submitAdr` calls `validate(form.value)` (composable owns the error toast); a `watch(form, simpleValidate, { deep: true })` re-validates live after the first failed submit so errors clear as fields are fixed. `FormField`s bind `validationErrors?.properties?.<field>?.errors`. Verified the treeifyError shape matches the binding path.
-- Noted improvement for the shared composable (left unchanged to avoid cross-project divergence): guard against a null schema in `validate`/`simpleValidate` (currently can throw). Optional: auto-`watch` a schema `Ref`; derive `ZodErrorTree` from `ReturnType<typeof z.treeifyError>`.
-
-### Cleanup — extracted create-page logic into a composable
-- The create page's `<script setup>` had grown to ~200 lines. Moved all state/behaviour into [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) — form state + types, validation, markdown assembly, dark-mode tracking, id fetch, live re-validation, and all actions (`addAlternative`, `add/removeCustomSection`, `saveDraft`, `submitAdr`), plus the static UI config (`statusOptions`, `formatOptions`, `mdToolbars`).
-- [CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) is now template + a single `useCreateAdr()` destructure (~20-line script). Pure extraction — no behaviour change, type-checks clean. Bonus: concentrates ADR-structure logic in one file, which will help when configurable formats land.
+### Create page — unsaved-changes guard
+- Added dirty-tracking + a leave warning to [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts): snapshots the form as a pristine baseline after load (new id / resumed draft) and after each save; `isDirty` = form ≠ baseline.
+- `onBeforeRouteLeave` blocks in-app navigation while dirty and shows a modal ([CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue)) warning that leaving discards progress. A `beforeunload` listener covers tab-close/refresh via the native prompt. Publish sets a bypass flag so creating an ADR doesn't trigger the warning.
+- Interpretation: warns only when there's actual unsaved content — a pristine, untouched new form (just the auto-assigned id) does not warn.
+- Dialog has three actions: **Leave without saving** (discards, proceeds via the bypass flag), **Cancel** (stays), **Save as draft** (saves → proceeds).
 
 ### Cleanup — enforce router → service → db/storage layering
 - The `knowledge_base` router was calling `chroma_helper` (db) and `blob_storage` (storage) directly, and even orchestrated two-store deletes in the controller — breaking the layering stated in CLAUDE.md.
@@ -54,30 +46,9 @@ This is the internal engineering journal — for user-facing release notes see [
 - Added a **null-schema guard** to `validate`/`simpleValidate` (capture `currentSchema.value` to a const, bail early — `validate` returns `true`, `simpleValidate` no-ops), removing the latent NPE and giving clean TS narrowing. Type-checks + lints clean.
 - Note: this composable is shared across the user's projects — both fixes are worth backporting.
 
-### Draft support (single overwritable version per draft) — end to end
-- **Backend:** drafts stored as opaque form JSON at `drafts/<id>.json` in blob storage (never indexed). Dedicated [router/draft.py](rag/router/draft.py) (`/knowledge-base/drafts`) → [draft_service.py](rag/service/draft_service.py) (owns JSON (de)serialization) → blob helpers. CRUD: list, `PUT/GET/DELETE /{id}`. Included before `knowledge_base` router so it wins over `/{source}`.
-- **Frontend:** separate `draftService` object in [api-service.ts](ui/src/api-service.ts) (mirrors the backend split). [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) tracks a `draftId` (UUID generated on first save, independent of the ADR id since next-id isn't reserved). Resume via `?draft=<id>` (loads on mount); saving overwrites the same id.
-- **Publish consumes the draft:** after a successful create, `deleteDraft(draftId)` removes it from storage so it drops out of the list (best-effort — a cleanup failure doesn't fail the already-created ADR).
-- **List page** ([KnowledgeBaseListPage.vue](ui/src/pages/KnowledgeBaseListPage.vue)) merges drafts with published ADRs, adds a **Type** column (Draft tag vs "Published"), resumes drafts on row-click, and routes delete to the right service.
-- Type-checks clean. Not yet exercised against a running MinIO — needs a live round-trip check.
-
-### Create page — unsaved-changes guard
-- Added dirty-tracking + a leave warning to [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts): snapshots the form as a pristine baseline after load (new id / resumed draft) and after each save; `isDirty` = form ≠ baseline.
-- `onBeforeRouteLeave` blocks in-app navigation while dirty and shows a modal ([CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue)) warning that leaving discards progress, with **Save as draft** (saves → proceeds) and **Cancel** (stays). A `beforeunload` listener covers tab-close/refresh via the native prompt. Publish sets a bypass flag so creating an ADR doesn't trigger the warning.
-- Interpretation: warns only when there's actual unsaved content — a pristine, untouched new form (just the auto-assigned id) does not warn.
-- Dialog has three actions: **Leave without saving** (discards, proceeds via the bypass flag), **Cancel** (stays), **Save as draft** (saves → proceeds).
-
 ### Cleanup — untracked regenerable RAG artifacts (git hygiene)
-- `rag/chroma_db/` (vector store) and `rag/record_manager.db` (dedup record manager) were tracked in git, churning binary diffs into every commit and effectively syncing a vector DB through git. Added them to [.gitignore](.gitignore) and `git rm --cached`'d them (kept on disk). Commit `4518dcd`; working tree no longer churns.
+- `rag/chroma_db/` (vector store) and `rag/record_manager.db` (dedup record manager) were tracked in git, churning binary diffs into every commit and effectively syncing a vector DB through git. Added them to [.gitignore](.gitignore) and `git rm --cached`'d them (kept on disk). Working tree no longer churns.
 - **Cross-device note:** these are now per-device. On the other device's next pull, git removes its tracked copies — either back them up + restore after pull (keep the index, no reindex), or let them go and reindex. They're a matched pair (`chroma_db` + `record_manager.db`) — always rebuild/copy both together or incremental dedup breaks.
-
-### Sidebar collapsed state persisted
-- Swapped the in-memory `collapsed` ref in [useSidebar.ts](ui/src/composables/useSidebar.ts) for `@vueuse/core`'s `useStorage` (key `patterngen:sidebar-collapsed`, default collapsed). Persists across reloads; still a module-level singleton so Sidebar + AppLayout stay in sync. No component changes needed.
-
-### Overwrite guard on create (title-based, non-destructive)
-- Create was destructive: `create_document_endpoint` indexed unconditionally, and `index_document` overwrites via `upload_to_blob` (put_object) + `add_to_index` (`cleanup="incremental"`) — so two ADRs whose H1s slug to the same key silently clobbered each other.
-- Guard added in [knowledge_base_service.py](rag/service/knowledge_base_service.py): `_title_slug` strips the `adr-<n>-` id prefix and `source_exist` compares **title slugs** (so the auto-incremented id is ignored — same title + different id is still caught). The create endpoint returns **409** with a detail message instead of overwriting; user must change the title (no overwrite path, by design). Edit/reindex endpoint untouched (overwrite is correct there).
-- Frontend: `submitAdr` reads `error.response?.data?.detail` (via `axios.isAxiosError`) and shows it in the error toast; on 409 the draft is preserved and there's no navigation, so the user can rename and retry. Verified against real data: same-title/diff-id → conflict; new title → allowed.
 
 ### Planned feature — multi-device sync without hosted services (Option A, deferred)
 Blob (MinIO) runs in a per-device Docker volume and `chroma_db` is now per-device, so nothing syncs across the user's two machines except `docs/adr/*.md` (git-tracked). Goal: keep the workflow in sync with no cloud/hosted storage.
@@ -85,6 +56,44 @@ Blob (MinIO) runs in a per-device Docker volume and `chroma_db` is now per-devic
 - **Chosen direction (Option A):** make `docs/adr/*.md` the git-synced source of truth. Two pieces to build: (1) the create flow writes created ADRs into `docs/adr/` (not just blob); (2) a **reindex-from-`docs/adr`** command/endpoint each device runs after pulling to rebuild its local `chroma_db` + repopulate MinIO. (That reindex-from-source command is also the keystone for general multi-device consistency.)
 - **Alternatives considered:** Syncthing (P2P file sync, no cloud) for a folder of ADR markdown; or manual export/import scripts (blob ⇄ files). For a zero-hosted git remote, a LAN/USB git remote works.
 - Deferred — user will tackle later.
+
+## 2026-07-05
+
+### Create ADR page — full redesign
+- Reworked [ui/src/pages/CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) from a 4-step wizard into a **form + live markdown preview** split. All fields now use the shared `FormField` component; the right pane renders the assembled ADR (via `MdPreview`) live, in the same format as `docs/adr/`.
+- **Code-capable sections:** Decision, a new Implementation section, and Notes use `md-editor-v3`'s `MdEditor` (trimmed toolbar, editor-only since the page has its own preview). Context/Consequences stay plain Textareas.
+- **Custom sections:** users can add their own sections with a heading, body, and a per-section Plain-text / Rich-text toggle (`SelectButton`). Flows into the doc as `## {heading}`.
+- **Design decision:** structured form for *create* (guided on-ramp for people unfamiliar with markdown); the *edit* page stays a single markdown editor. Format is a recommendation, not a requirement — arbitrary markdown still flows through upload + edit.
+
+### Create ADR — persistence wired (no backend changes)
+- `submitAdr` now assembles the fields into markdown, derives a `source` slug from id + title, and POSTs via `knowledgeBaseService.saveMarkdown` to the existing `/knowledge-base/index-document` endpoint — which already writes to blob storage + indexes. Added required-field validation (inline `FormField` errors + toast), loading state, and redirect to the list on success.
+- Renamed `api-service` `reindexRecord` → `saveMarkdown` (serves both create and edit); updated the edit-page call site.
+- (Superseded later on 2026-07-05: source generation moved to the backend — see below.)
+
+### Live preview scroll fix
+- The preview pane wasn't scrolling — content past a certain point was clipped. Root cause: `md-editor`'s root is `height: 100%`, but the card had no bounded height, so the preview grew unbounded and `max-h` just clipped it. Fixed by making the preview card a `flex flex-col` bounded to `max-h-[calc(100vh-...)]`, with a `shrink-0` header and the preview as a `flex-1 min-h-0 overflow-y-auto` child so it scrolls internally while the card stays sticky.
+
+### Collapsible sidebar
+- Added a `useSidebar` composable (module-level shared `collapsed` ref, default collapsed). [Sidebar.vue](ui/src/components/layout/Sidebar.vue) animates w-16 ↔ w-64 with icon-only + tooltips when collapsed; [AppLayout.vue](ui/src/components/layout/AppLayout.vue) shifts content margin in step. (In-memory at the time; localStorage persistence added 2026-07-12.)
+
+### Cleanup — source generation moved to backend
+- The frontend was slugifying the `source` key itself before submitting. Moved that logic server-side: `slugify` + `generate_source` in [knowledge_base_service.py](rag/service/knowledge_base_service.py) derive the key from the document's first `# ` H1 (which carries the id, e.g. `# ADR-003: …`).
+- New `POST /knowledge-base` create endpoint derives the source, indexes, and returns `{ source, result }` (400 if no H1). `index-document` (explicit source) still serves the edit/reindex path.
+- Frontend: removed the `slugify` helper; `submitAdr` calls the new `createDocument(content)` and uses the backend-returned source. `saveMarkdown` kept for edits. Resulting slug is unchanged — only where it's computed.
+
+### Cleanup — auto-assigned ADR id
+- The create form hardcoded `ADR-003`. Now the backend assigns it: `list_sources()` ([chroma_helper.py](rag/db/chroma_helper.py)) + `next_adr_id()` ([knowledge_base_service.py](rag/service/knowledge_base_service.py)) scan existing `adr-NNN` source prefixes and return max+1 (zero-padded), exposed via `GET /knowledge-base/next-id` (declared before `/{source}` so the static path wins).
+- Frontend fetches it on mount; header shows "Assigning ID…" and **Create** is disabled until the id arrives; on fetch failure it stays disabled (avoids overwriting an existing id). Verified: with adr-001/002/003 indexed, next id = `ADR-004`.
+- Known caveat: best-effort, not a reservation — concurrent creates could get the same id (this is why the overwrite guard compares titles, not full source keys).
+
+### Cleanup — form validation via zod composable
+- Replaced the create page's hand-rolled `validate()` + `errors` ref with the reusable `useZodValidation` composable ([ui/src/composables/useZodValidation.ts](ui/src/composables/useZodValidation.ts)) driven by a new [adrSchema.ts](ui/src/schemas/adrSchema.ts) (title/status/scope/decision required; extra form keys ignored).
+- `submitAdr` calls `validate(form.value)` (composable owns the error toast); a `watch(form, simpleValidate, { deep: true })` re-validates live after the first failed submit so errors clear as fields are fixed. `FormField`s bind `validationErrors?.properties?.<field>?.errors`. Verified the treeifyError shape matches the binding path.
+- (The composable itself was hardened later on 2026-07-11: `ZodTypeAny` → `z.ZodType`, null-schema guard.)
+
+### Cleanup — extracted create-page logic into a composable
+- The create page's `<script setup>` had grown to ~200 lines. Moved all state/behaviour into [useCreateAdr.ts](ui/src/composables/useCreateAdr.ts) — form state + types, validation, markdown assembly, dark-mode tracking, id fetch, live re-validation, and all actions (`addAlternative`, `add/removeCustomSection`, `saveDraft`, `submitAdr`), plus the static UI config (`statusOptions`, `formatOptions`, `mdToolbars`).
+- [CreateAdrTemplatePage.vue](ui/src/pages/CreateAdrTemplatePage.vue) is now template + a single `useCreateAdr()` destructure (~20-line script). Pure extraction — no behaviour change, type-checks clean. Bonus: concentrates ADR-structure logic in one file, which will help when configurable formats land.
 
 ### Planned feature — AI ADR quality review (design, not built)
 Advisory quality gate that reviews an ADR *before* submission and flags issues, so users can fix or submit anyway. Motivation: garbage-in-garbage-out — ADR quality gates generation quality downstream (cf. the self-contradictory ADR-001 the generator faithfully copied, and the mangled ADR-002 that wrecked retrieval).
@@ -117,13 +126,6 @@ Rough shape / things to figure out later:
 
 Not being tackled yet — parked alongside the quality-review feature.
 
-### What to do next
-- **Planned features (parked, not started):** (1) AI ADR quality review — suggested start is deterministic structural checks, then the LLM semantic pass; (2) configurable ADR formats per team. See the two design notes above.
-- **Verify the create flow end-to-end** — largely confirmed: `adr-003-api-authentication-strategy` is indexed from the UI test. Still worth a spot-check that it renders in the list and is retrievable via a generate-boilerplate prompt.
-- **Test the draft flow against MinIO** — save → resume → publish (draft deleted) → delete-from-list, end to end.
-- **Multi-device sync (Option A, parked)** — see design note above: write created ADRs into `docs/adr/`, add a reindex-from-source command. User will tackle later.
-- **Lower-priority backlog** — backend health-check on extension activate; `.env` path inconsistency in [rag/storage/blob_storage.py](rag/storage/blob_storage.py) (loads `rag/.env`, which doesn't exist — works only by accident).
-
 ## 2026-06-21
 
 ### Boilerplate generation — template crash fix
@@ -139,8 +141,7 @@ Not being tackled yet — parked alongside the quality-review feature.
 - ADR-002 was badly mangled in the store (30 fragmented chunks, lost spaces, `## •`/`## 1` artifacts). Rewrote it as clean markdown at [docs/adr/adr-002-frontend-state-management.md](docs/adr/adr-002-frontend-state-management.md) → splits into 7 clean chunks. Reindexed both ADRs so they carry `chunk_index`.
 
 ### Threshold calibration
-- Tuned `score_threshold` against observed relevance scores: started 0.15 → 0.1 → **0.0**. A task-phrased query ("create a hook to fetch products") scored only 0.010 for the relevant ADR and was being filtered out as a false negative. Junk/vague queries score *negative*, so 0.0 cleanly separates genuine matches from noise.
-- Verified end-to-end: error-handling and products-hook prompts now generate ADR-compliant code (custom exception classes + `{data,error}` shape; TanStack Query + `apiFetcher` respectively).
+- Tuned `score_threshold` against observed relevance scores: started 0.15 → 0.1 → **0.0**. A task-phrased query ("create a hook to fetch products") scored only 0.010 for the relevant ADR and was being filtered out as a false negative. Junk/vague queries score *negative*, so 0.0 cleanly separates genuine matches from noise. (Superseded by the bge upgrade below — threshold later set to 0.5.)
 
 ### Investigated — SQLRecordManager / langchain-classic (no action)
 - Questioned whether `SQLRecordManager` (imported from `langchain_classic.indexes` in [rag/db/chroma_helper.py](rag/db/chroma_helper.py)) is on a deprecation path. Checked installed versions (langchain 1.3.1, core 1.4.0, classic 1.0.7) and the official v1 migration guide.
@@ -159,6 +160,5 @@ Not being tackled yet — parked alongside the quality-review feature.
 - **Re-run it after** changing the embedding model, adding a batch of ADRs, or if the generator starts ignoring relevant ADRs / pulling in irrelevant ones. Keep the GENUINE/JUNK lists representative of the real knowledge base.
 
 ### Notes / known limitations
-- The `0.0` threshold is calibrated against only 2 ADRs — recheck as the knowledge base grows.
-- Root cause of fragile retrieval is the embedding model (`all-MiniLM-L6-v2`): small, general-purpose, weak on code/architecture vocabulary. Durable fix is a stronger/code-aware embedding model and/or query enrichment (e.g. HyDE) — not threshold tuning.
+- The `score_threshold` (now `0.5` after the bge upgrade) is calibrated against only 2 ADRs — recheck as the knowledge base grows.
 - PROGRESS.md is a throwaway artifact from Claude Cowork; this DEVLOG is the source of truth going forward.
