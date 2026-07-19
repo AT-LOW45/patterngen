@@ -76,4 +76,4 @@ Vue 3 `<script setup>`, vue-router, PrimeVue components, Tailwind v4 (via `@tail
 - `src/rag/` contains only a stray `.venv` + `uv.lock` (a misplaced virtualenv) — **the real backend is `rag/`**. Don't edit or reference `src/rag/`.
 - The extension talks to the backend over HTTP; there's no shared type contract. When you change a request/response shape, update **both** the Python `schema/boilerplate_schema.py` (Pydantic) and the TS caller.
 - CORS in `server.py` only allows `:5173`/`:5174` (Vite dev). Production is same-origin, so no CORS needed there.
-- `DEVLOG.md` (dated engineering journal) and `CHANGELOG.md` (release notes) are kept up to date by convention — several recent commits are devlog/changelog updates.
+- Roadmap and tasks live in **GitHub Issues** (`AT-LOW45/patterngen`); `CHANGELOG.md` holds user-facing release notes. (There was a `DEVLOG.md` engineering journal — retired in favour of Issues + git history; recover from git history if needed.)

@@ -132,5 +132,5 @@ This extension contributes the following setting:
 
 ## Development
 
-- [DEVLOG.md](DEVLOG.md) — dated engineering journal
+- **Roadmap & tasks:** [GitHub Issues](https://github.com/AT-LOW45/patterngen/issues)
 - [CHANGELOG.md](CHANGELOG.md) — user-facing release notes
