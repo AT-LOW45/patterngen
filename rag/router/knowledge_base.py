@@ -13,6 +13,7 @@ from service.knowledge_base_service import (
     delete_document,
     clear_documents,
 )
+from service.review_service import review_adr
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
 
@@ -93,3 +94,8 @@ async def delete_document_endpoint(source: str):
 @router.delete("")
 async def clear_knowledge_base_endpoint():
     return JSONResponse(content={"deleted": clear_documents()})
+
+
+@router.post("/adr-review")
+async def review_adr_endpoint(content: CreateDocumentRequest):
+    return await review_adr(content.content)
