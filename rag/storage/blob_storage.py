@@ -4,7 +4,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from exception.document_not_found_error import DocumentNotFoundError
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+# The .env lives at the repo root (…/patterngen/.env), two levels up from this file
+# (rag/storage/blob_storage.py). Load it explicitly so blob creds are available
+# regardless of import order or which entrypoint is running.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 client = boto3.client(
     "s3",
