@@ -50,3 +50,9 @@ export const draftService = {
 	saveDraft: (id: string, draft: AdrForm) => api.put(`/knowledge-base/drafts/${encodeURIComponent(id)}`, draft),
 	deleteDraft: (id: string) => api.delete(`/knowledge-base/drafts/${encodeURIComponent(id)}`),
 } as const;
+
+export type ReviewFinding = { severity: "warning" | "error"; section: string; message: string };
+
+export const reviewService = {
+	reviewDocument: (content: string) => api.post<{ findings: ReviewFinding[] }>("/knowledge-base/adr-review", { content }),
+};

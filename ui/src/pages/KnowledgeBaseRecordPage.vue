@@ -42,10 +42,13 @@
 			</div>
 		</div>
 	</div>
+
+	<ReviewFindingsDialog v-model:visible="reviewDialogOpen" :findings="reviewFindings" :loading="checking" @submit-anyway="onSubmitAnyway" />
 </template>
 
 <script setup lang="ts">
-import { knowledgeBaseService } from "@/api-service";
+import { knowledgeBaseService, ReviewFinding, reviewService } from "@/api-service";
+import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
 import { MdEditor } from "md-editor-v3";
 import { Button, Select, useToast } from "primevue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -61,6 +64,10 @@ const recordData = ref<any>(null);
 const isLoadingRecord = ref(false);
 const saving = ref(false);
 const editorText = ref("");
+
+const checking = ref(false);
+const reviewDialogOpen = ref(false);
+const reviewFindings = ref<ReviewFinding[]>([]);
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -138,9 +145,47 @@ const onRecordSelected = () => {
 	}
 };
 
+const hasAdrErrors = async () => {
+	checking.value = true;
+	try {
+		reviewDialogOpen.value = true;
+		const result = await reviewService.reviewDocument(editorText.value);
+		const findings = result.data.findings;
+		if (findings.length > 0) {
+			reviewFindings.value = findings;
+			return true;
+		}
+		return false;
+	} catch (error) {
+		reviewDialogOpen.value = false;
+		toast.add({ severity: "error", summary: "Review Failed", detail: "ADR review failed, please try again later.", life: 3000 });
+		return true;
+	} finally {
+		checking.value = false;
+	}
+};
+
 const onSave = async () => {
 	saving.value = true;
 	try {
+		const needsAmendment = await hasAdrErrors();
+		if (needsAmendment) return;
+		reviewDialogOpen.value = false;
+
+		await knowledgeBaseService.saveMarkdown(currentRecord.value, editorText.value);
+		toast.add({ severity: "success", summary: "Record reindexed", life: 3000 });
+	} catch (error) {
+		console.error("Failed to reindex record:", error);
+		toast.add({ severity: "error", summary: "Failed to reindex record", life: 3000 });
+	} finally {
+		saving.value = false;
+	}
+};
+
+// User chose "Submit anyway" in the review dialog — save without re-reviewing.
+const onSubmitAnyway = async () => {
+	try {
+		saving.value = true;
 		await knowledgeBaseService.saveMarkdown(currentRecord.value, editorText.value);
 		toast.add({ severity: "success", summary: "Record reindexed", life: 3000 });
 	} catch (error) {

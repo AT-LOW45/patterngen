@@ -4,7 +4,7 @@
 		<div class="flex items-end justify-between gap-4">
 			<div class="flex flex-col gap-1">
 				<h1 class="text-xl font-medium text-slate-700 dark:text-surface-100">Create ADR</h1>
-				<p class=" text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
+				<p class="text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
 				<span class="font-mono text-sm text-slate-400">{{ form.id || "Assigning ID…" }}</span>
@@ -18,7 +18,8 @@
 				<!-- Overview -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
-						<i class="pi pi-info-circle text-xs" /> Overview
+						<i class="pi pi-info-circle text-xs" />
+						Overview
 					</h2>
 
 					<FormField label="Title" required :error-message="validationErrors?.properties?.title?.errors">
@@ -29,23 +30,40 @@
 						<FormField label="Status" required :error-message="validationErrors?.properties?.status?.errors">
 							<Select v-model="form.status" :options="statusOptions" placeholder="Select status" fluid />
 						</FormField>
-						<FormField label="Scope" required :tip="{ message: 'The system or component boundary this applies to.' }" :error-message="validationErrors?.properties?.scope?.errors">
+						<FormField
+							label="Scope"
+							required
+							:tip="{ message: 'The system or component boundary this applies to.' }"
+							:error-message="validationErrors?.properties?.scope?.errors"
+						>
 							<InputText v-model="form.scope" placeholder="e.g. Backend API" fluid />
 						</FormField>
 					</div>
 
 					<FormField label="Context">
-						<Textarea v-model="form.context" placeholder="Describe the situation and why a decision was needed..." :auto-resize="true" rows="4" fluid />
+						<Textarea
+							v-model="form.context"
+							placeholder="Describe the situation and why a decision was needed..."
+							:auto-resize="true"
+							rows="4"
+							fluid
+						/>
 					</FormField>
 				</section>
 
 				<!-- Decision -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
-						<i class="pi pi-lightbulb text-xs" /> Decision
+						<i class="pi pi-lightbulb text-xs" />
+						Decision
 					</h2>
 
-					<FormField label="Decision" required :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }" :error-message="validationErrors?.properties?.decision?.errors">
+					<FormField
+						label="Decision"
+						required
+						:tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }"
+						:error-message="validationErrors?.properties?.decision?.errors"
+					>
 						<MdEditor
 							v-model="form.decision"
 							:theme="isDark ? 'dark' : 'light'"
@@ -60,7 +78,12 @@
 
 					<FormField label="Alternatives considered">
 						<div class="flex gap-2">
-							<InputText v-model="alternativeInput" placeholder="Add an alternative..." class="flex-1" @keydown.enter.prevent="addAlternative" />
+							<InputText
+								v-model="alternativeInput"
+								placeholder="Add an alternative..."
+								class="flex-1"
+								@keydown.enter.prevent="addAlternative"
+							/>
 							<Button icon="pi pi-plus" severity="secondary" aria-label="Add alternative" @click="addAlternative" />
 						</div>
 						<div v-if="form.alternatives.length" class="flex flex-wrap gap-1.5 mt-2">
@@ -76,10 +99,14 @@
 				<!-- Implementation -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
-						<i class="pi pi-code text-xs" /> Implementation
+						<i class="pi pi-code text-xs" />
+						Implementation
 					</h2>
 
-					<FormField label="Implementation" :tip="{ message: 'Code examples, exception classes, response shapes. Use the </> button for fenced code blocks.' }">
+					<FormField
+						label="Implementation"
+						:tip="{ message: 'Code examples, exception classes, response shapes. Use the </> button for fenced code blocks.' }"
+					>
 						<MdEditor
 							v-model="form.implementation"
 							:theme="isDark ? 'dark' : 'light'"
@@ -96,7 +123,8 @@
 				<!-- Custom sections -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
-						<i class="pi pi-plus-circle text-xs" /> Custom sections
+						<i class="pi pi-plus-circle text-xs" />
+						Custom sections
 					</h2>
 
 					<div
@@ -144,15 +172,28 @@
 				<!-- Consequences -->
 				<section class="flex flex-col gap-4">
 					<h2 class="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-400">
-						<i class="pi pi-arrows-h text-xs" /> Consequences
+						<i class="pi pi-arrows-h text-xs" />
+						Consequences
 					</h2>
 
 					<FormField label="Positive consequences">
-						<Textarea v-model="form.positiveConsequences" placeholder="What improves as a result of this decision?" :auto-resize="true" rows="3" fluid />
+						<Textarea
+							v-model="form.positiveConsequences"
+							placeholder="What improves as a result of this decision?"
+							:auto-resize="true"
+							rows="3"
+							fluid
+						/>
 					</FormField>
 
 					<FormField label="Negative consequences / trade-offs">
-						<Textarea v-model="form.negativeConsequences" placeholder="What gets harder, slower, or more complex?" :auto-resize="true" rows="3" fluid />
+						<Textarea
+							v-model="form.negativeConsequences"
+							placeholder="What gets harder, slower, or more complex?"
+							:auto-resize="true"
+							rows="3"
+							fluid
+						/>
 					</FormField>
 
 					<FormField label="Notes" :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }">
@@ -172,8 +213,12 @@
 
 			<!-- RIGHT: live preview (sticky) -->
 			<div class="lg:sticky lg:top-5">
-				<div class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden flex flex-col max-h-[calc(100vh-5.5rem)]">
-					<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800 shrink-0">
+				<div
+					class="rounded-xl border border-slate-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden flex flex-col max-h-[calc(100vh-5.5rem)]"
+				>
+					<div
+						class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-surface-700 bg-slate-50 dark:bg-surface-800 shrink-0"
+					>
 						<i class="pi pi-eye text-slate-400 text-sm" />
 						<span class="text-sm font-medium text-slate-500 dark:text-surface-300">Live preview</span>
 						<span class="ml-auto text-xs text-slate-400">{{ form.id || "adr" }}.md</span>
@@ -195,26 +240,29 @@
 			<Button label="Save draft" severity="secondary" icon="pi pi-save" :loading="savingDraft" :disabled="submitting" @click="saveDraft" />
 			<Button label="Create ADR" icon="pi pi-check" icon-pos="right" :loading="submitting" :disabled="!form.id" @click="submitAdr" />
 		</div>
-
-		<!-- Unsaved-changes warning shown when navigating away with unsaved progress -->
-		<Dialog v-model:visible="showLeaveDialog" header="Unsaved changes" :modal="true" :closable="false" :style="{ width: '460px' }">
-			<p class="text-slate-600 dark:text-surface-300">
-				Leaving this page will discard your unsaved progress. Would you like to save it as a draft first?
-			</p>
-			<template #footer>
-				<div class="flex w-full items-center justify-between">
-					<Button label="Leave without saving" severity="danger" text @click="discardAndLeave" />
-					<div class="flex gap-2">
-						<Button label="Cancel" severity="secondary" text @click="cancelLeave" />
-						<Button label="Save as draft" icon="pi pi-save" :loading="savingDraft" @click="saveDraftAndLeave" />
-					</div>
-				</div>
-			</template>
-		</Dialog>
 	</div>
+
+	<!-- Unsaved-changes warning shown when navigating away with unsaved progress -->
+	<Dialog v-model:visible="showLeaveDialog" header="Unsaved changes" :modal="true" :closable="false" :style="{ width: '460px' }">
+		<p class="text-slate-600 dark:text-surface-300">
+			Leaving this page will discard your unsaved progress. Would you like to save it as a draft first?
+		</p>
+		<template #footer>
+			<div class="flex w-full items-center justify-between">
+				<Button label="Leave without saving" severity="danger" text @click="discardAndLeave" />
+				<div class="flex gap-2">
+					<Button label="Cancel" severity="secondary" text @click="cancelLeave" />
+					<Button label="Save as draft" icon="pi pi-save" :loading="savingDraft" @click="saveDraftAndLeave" />
+				</div>
+			</div>
+		</template>
+	</Dialog>
+
+	<ReviewFindingsDialog v-model:visible="showReviewDialog" :findings="reviewFindings" :loading="checking" @submit-anyway="submitAnyway" />
 </template>
 
 <script setup lang="ts">
+import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
 import FormField from "@/components/form/FormField.vue";
 import { useCreateAdr } from "@/composables/useCreateAdr";
 import { MdEditor, MdPreview } from "md-editor-v3";
@@ -241,5 +289,9 @@ const {
 	cancelLeave,
 	discardAndLeave,
 	saveDraftAndLeave,
+	reviewFindings,
+	showReviewDialog,
+	checking,
+	submitAnyway
 } = useCreateAdr();
 </script>

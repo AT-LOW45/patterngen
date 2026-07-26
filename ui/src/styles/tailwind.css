@@ -14,3 +14,7 @@ body {
 #md-editor-v-16-preview {
 	overflow-y: auto !important;
 }
+
+.md-editor-code-head{
+	z-index: 10 !important;
+}

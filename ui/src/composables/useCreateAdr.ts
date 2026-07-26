@@ -1,12 +1,12 @@
-import { knowledgeBaseService, draftService } from "@/api-service";
-import { adrSchema } from "@/schemas/adrSchema";
+import { draftService, knowledgeBaseService, ReviewFinding, reviewService } from "@/api-service";
 import useZodValidation from "@/composables/useZodValidation";
 import ROUTES from "@/router/routes";
+import { adrSchema } from "@/schemas/adrSchema";
+import axios from "axios";
 import type { ToolbarNames } from "md-editor-v3";
 import { useToast } from "primevue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
-import axios from "axios";
 
 export type SectionFormat = "plain" | "rich";
 
@@ -112,6 +112,11 @@ export function useCreateAdr() {
 	const showLeaveDialog = ref<boolean>(false);
 	const pendingRoute = ref<string | null>(null);
 	const bypassLeaveGuard = ref<boolean>(false); // set for our own post-publish navigation
+
+	// review ADR quality
+	const checking = ref(false);
+	const reviewFindings = ref<ReviewFinding[]>([]);
+	const showReviewDialog = ref(false);
 
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
@@ -296,9 +301,54 @@ export function useCreateAdr() {
 		}
 	};
 
+	const checkQuality = async () => {
+		checking.value = true;
+		try {
+			const result = await reviewService.reviewDocument(markdown.value);
+			reviewFindings.value = result.data.findings;
+			showReviewDialog.value = true;
+		} catch (error) {
+			console.error(error);
+		} finally {
+			checking.value = false;
+		}
+	};
+
 	const submitAdr = async (): Promise<void> => {
 		if (!validate(form.value)) return;
 
+		submitting.value = true;
+		try {
+			await checkQuality();
+			if (reviewFindings.value.length > 0) {
+				return;
+			}
+
+			const { data } = await knowledgeBaseService.createDocument(markdown.value);
+
+			// Publishing consumes the draft — remove it so it no longer shows in the list.
+			// Best-effort: the ADR is already created, so a cleanup failure shouldn't fail the publish.
+			if (draftId.value) {
+				try {
+					await draftService.deleteDraft(draftId.value);
+				} catch (error) {
+					console.error("Failed to remove draft after publish:", error);
+				}
+				draftId.value = null;
+			}
+
+			toast.add({ severity: "success", summary: "ADR created", detail: data.source, life: 3000 });
+			bypassLeaveGuard.value = true; // our own navigation — skip the unsaved-changes guard
+			router.push(ROUTES.knowledgeBase);
+		} catch (error: any) {
+			const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+			toast.add({ severity: "error", summary: "Failed to create ADR", life: 3000, detail: detail });
+		} finally {
+			submitting.value = false;
+		}
+	};
+
+	const submitAnyway = async () => {
 		submitting.value = true;
 		try {
 			const { data } = await knowledgeBaseService.createDocument(markdown.value);
@@ -351,5 +401,12 @@ export function useCreateAdr() {
 		removeCustomSection,
 		saveDraft,
 		submitAdr,
+
+		// adr quality review
+		checking,
+		reviewFindings,
+		showReviewDialog,
+		checkQuality,
+		submitAnyway,
 	};
 }
