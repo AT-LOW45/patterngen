@@ -35,7 +35,10 @@
 		<div v-else-if="recordData" class="bg-white rounded-lg shadow-md p-6">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-2xl font-bold">{{ recordData.source }}</h2>
-				<Button label="Save" icon="pi pi-save" :loading="saving" @click="onSave" />
+				<div class="flex items-center gap-2">
+					<Button label="Download" icon="pi pi-download" severity="secondary" outlined @click="onDownload" />
+					<Button label="Save" icon="pi pi-save" :loading="saving" @click="onSave" />
+				</div>
 			</div>
 			<div class="space-y-4">
 				<MdEditor v-model="editorText" style="height: 75vh" />
@@ -55,6 +58,7 @@
 <script setup lang="ts">
 import { knowledgeBaseService, ReviewFinding, reviewService } from "@/api-service";
 import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
+import { downloadMarkdown } from "@/utils/download-markdown";
 import { MdEditor } from "md-editor-v3";
 import { Button, Select, useToast } from "primevue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -150,6 +154,12 @@ const onRecordSelected = () => {
 	if (currentRecord.value) {
 		router.push(`/knowledge-base/${currentRecord.value}`);
 	}
+};
+
+// Downloads what's currently in the editor, including unsaved edits — the user
+// gets the document they can see, not the last indexed version.
+const onDownload = () => {
+	downloadMarkdown(currentRecord.value, editorText.value);
 };
 
 const hasAdrErrors = async () => {

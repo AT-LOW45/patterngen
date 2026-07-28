@@ -21,6 +21,16 @@
 				<Column header="Actions">
 					<template #body="{ data }">
 						<div class="flex items-center justify-start gap-2">
+							<!-- Drafts are stored as the form object, not markdown, so there's nothing to download yet. -->
+							<Button
+								v-if="!data.isDraft"
+								text
+								severity="secondary"
+								icon="pi pi-download"
+								v-tooltip.top="'Download as markdown'"
+								:loading="downloading === data.name"
+								@click.stop="onDownload(data)"
+							/>
 							<Button text severity="danger" icon="pi pi-trash" @click="onDelete(data)" />
 						</div>
 					</template>
@@ -91,6 +101,7 @@
 import { knowledgeBaseService, draftService } from "@/api-service";
 import FormField from "@/components/form/FormField.vue";
 import ROUTES from "@/router/routes";
+import { downloadMarkdown } from "@/utils/download-markdown";
 import { Button, Column, DataTable, Dialog, FileUpload, InputText, Menu, Message, Tag, useConfirm, useToast } from "primevue";
 import { MenuItem } from "primevue/menuitem";
 import { onMounted, ref } from "vue";
@@ -114,6 +125,8 @@ const dialogVisible = ref(false);
 const sourceInput = ref("");
 const selectedFile = ref<File | null>(null);
 const uploading = ref(false);
+// Source name currently being fetched for download, so only that row spins.
+const downloading = ref<string | null>(null);
 const fileUploadRef = ref();
 const menu = ref();
 const menuItems = ref<MenuItem[]>([
@@ -170,6 +183,21 @@ const onRowClick = (event: any) => {
 		router.push({ path: ROUTES.knowledgeBaseCreate, query: { draft: row.draftId } });
 	} else {
 		router.push({ name: "KnowledgeBaseRecord", params: { id: row.name } });
+	}
+};
+
+// The list only holds source names, so fetch the raw markdown before handing it
+// to the browser. `@click.stop` on the button keeps the row-click navigation from
+// firing alongside the download.
+const onDownload = async (record: KnowledgeBaseRecord) => {
+	downloading.value = record.name;
+	try {
+		const { data } = await knowledgeBaseService.getRawRecord(record.name);
+		downloadMarkdown(record.name, data.content);
+	} catch (err) {
+		toast.add({ severity: "error", summary: "Failed to download record", detail: record.name, life: 3000 });
+	} finally {
+		downloading.value = null;
 	}
 };
 
