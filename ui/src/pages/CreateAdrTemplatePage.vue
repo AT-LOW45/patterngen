@@ -258,7 +258,13 @@
 		</template>
 	</Dialog>
 
-	<ReviewFindingsDialog v-model:visible="showReviewDialog" :findings="reviewFindings" :loading="checking" @submit-anyway="submitAnyway" />
+	<ReviewFindingsDialog
+		v-model:visible="showReviewDialog"
+		:findings="reviewFindings"
+		:loading="checking"
+		:error="hasReviewError"
+		@submit-anyway="submitAnyway"
+	/>
 </template>
 
 <script setup lang="ts">
@@ -292,6 +298,7 @@ const {
 	reviewFindings,
 	showReviewDialog,
 	checking,
-	submitAnyway
+	hasReviewError,
+	submitAnyway,
 } = useCreateAdr();
 </script>

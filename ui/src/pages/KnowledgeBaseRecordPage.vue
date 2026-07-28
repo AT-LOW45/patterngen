@@ -43,7 +43,13 @@
 		</div>
 	</div>
 
-	<ReviewFindingsDialog v-model:visible="reviewDialogOpen" :findings="reviewFindings" :loading="checking" @submit-anyway="onSubmitAnyway" />
+	<ReviewFindingsDialog
+		v-model:visible="reviewDialogOpen"
+		:findings="reviewFindings"
+		:loading="checking"
+		:error="hasReviewError"
+		@submit-anyway="onSubmitAnyway"
+	/>
 </template>
 
 <script setup lang="ts">
@@ -68,6 +74,7 @@ const editorText = ref("");
 const checking = ref(false);
 const reviewDialogOpen = ref(false);
 const reviewFindings = ref<ReviewFinding[]>([]);
+const hasReviewError = ref(false);
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -146,6 +153,8 @@ const onRecordSelected = () => {
 };
 
 const hasAdrErrors = async () => {
+	reviewFindings.value = [];
+	hasReviewError.value = false;
 	checking.value = true;
 	try {
 		reviewDialogOpen.value = true;
@@ -157,8 +166,7 @@ const hasAdrErrors = async () => {
 		}
 		return false;
 	} catch (error) {
-		reviewDialogOpen.value = false;
-		toast.add({ severity: "error", summary: "Review Failed", detail: "ADR review failed, please try again later.", life: 3000 });
+		hasReviewError.value = true;
 		return true;
 	} finally {
 		checking.value = false;

@@ -117,6 +117,7 @@ export function useCreateAdr() {
 	const checking = ref(false);
 	const reviewFindings = ref<ReviewFinding[]>([]);
 	const showReviewDialog = ref(false);
+	const hasReviewError = ref(false);
 
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
@@ -302,6 +303,8 @@ export function useCreateAdr() {
 	};
 
 	const checkQuality = async () => {
+		reviewFindings.value = [];
+		hasReviewError.value = false;
 		checking.value = true;
 		try {
 			const result = await reviewService.reviewDocument(markdown.value);
@@ -309,6 +312,9 @@ export function useCreateAdr() {
 			showReviewDialog.value = true;
 		} catch (error) {
 			console.error(error);
+			hasReviewError.value = true;
+			showReviewDialog.value = true;
+			reviewFindings.value = [];
 		} finally {
 			checking.value = false;
 		}
@@ -320,7 +326,7 @@ export function useCreateAdr() {
 		submitting.value = true;
 		try {
 			await checkQuality();
-			if (reviewFindings.value.length > 0) {
+			if (hasReviewError.value || reviewFindings.value.length > 0) {
 				return;
 			}
 
@@ -406,6 +412,7 @@ export function useCreateAdr() {
 		checking,
 		reviewFindings,
 		showReviewDialog,
+		hasReviewError,
 		checkQuality,
 		submitAnyway,
 	};
