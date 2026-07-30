@@ -88,10 +88,19 @@ def _find_h1(content: str) -> tuple[int, str] | None:
     return None
 
 
-def adr_id_from_source(source: str) -> str:
-    """The 'ADR-NNN' id embedded in a source key, or "" if it carries none."""
-    match = re.match(r"adr[-_ ]*0*(\d+)", source, re.IGNORECASE)
+def parse_adr_id(value: str) -> str:
+    """
+    The 'ADR-NNN' id at the start of a source key ('adr-004-auth') or a heading
+    ('ADR-4: Auth'), normalised to three digits. "" when there is none.
+    """
+    match = re.match(r"adr[-_ ]*0*(\d+)", value, re.IGNORECASE)
     return f"ADR-{int(match.group(1)):03d}" if match else ""
+
+
+def adr_id_from_content(content: str) -> str:
+    """The ADR id carried by the document's H1, or "" if it has none."""
+    found = _find_h1(content)
+    return parse_adr_id(found[1]) if found else ""
 
 
 def stamp_adr_id(
@@ -165,7 +174,7 @@ async def update_document(source: str, content: str) -> tuple[str, IndexingResul
     Indexes before deleting, so a failure midway leaves a duplicate (recoverable) rather
     than losing the record.
     """
-    adr_id = adr_id_from_source(source) or next_adr_id()
+    adr_id = parse_adr_id(source) or next_adr_id()
 
     stamped, new_source = stamp_adr_id(content, adr_id)
     if not new_source:
@@ -189,9 +198,10 @@ async def index_document(content: str, source: str) -> IndexingResult:
     # store original in blob storage
     upload_to_blob(content, source)
 
-    # index chunks in vector store
+    # index chunks in vector store. The ADR number is read back off the H1 rather than
+    # passed in, so the metadata can never disagree with the stored document.
     document = Document(page_content=content, metadata={"source": source})
-    result = add_to_index([document], source)
+    result = add_to_index([document], source, adr_id_from_content(content))
 
     return result
 

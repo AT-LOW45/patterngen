@@ -56,10 +56,21 @@ def split_documents(documents: list[Document]) -> list[Document]:
     return chunks
 
 
-def add_to_index(documents: list[Document], source: str) -> IndexingResult:
+def add_to_index(
+    documents: list[Document], source: str, adr_id: str = ""
+) -> IndexingResult:
+    """Index a document's chunks under `source`.
+
+    `adr_id` ('ADR-004') is recorded alongside so the number can be read without parsing
+    the markdown — it stays out of `source` itself only once the key is decoupled (see
+    issue #3); for now it is duplicated information kept in sync by the caller.
+    """
     for doc in documents:
         doc.metadata["source"] = source
+        if adr_id:
+            doc.metadata["adr_id"] = adr_id
 
+    # split_documents copies doc.metadata onto every chunk, so setting it here is enough.
     chunks = split_documents(documents)
 
     result = index(
