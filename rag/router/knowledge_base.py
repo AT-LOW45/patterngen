@@ -1,11 +1,12 @@
+
 from exception.document_not_found_error import DocumentNotFoundError
+from exception.source_error import DuplicateSourceError, SourceDerivationError
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException, UploadFile, File, APIRouter
 from schema.boilerplate_schema import CreateDocumentRequest
 from service.knowledge_base_service import (
-    source_exist,
-    index_document as kb_index_document,
-    generate_source,
+    create_document as kb_create_document,
+    update_document as kb_update_document,
     next_adr_id,
     list_documents,
     get_document_raw,
@@ -22,38 +23,63 @@ router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
 async def create_document_endpoint(request: CreateDocumentRequest):
     """Create a new record. The source key is derived server-side from the
     document's H1 title — callers do not supply it."""
-    source = generate_source(request.content)
-    if not source:
+    try:
+        source, result = await kb_create_document(request.content)
+    except SourceDerivationError:
         raise HTTPException(
             status_code=400,
             detail="Could not derive a source: the document needs a top-level '# ' title.",
         )
-
-    has_conflict = source_exist(source)
-
-    if has_conflict:
+    except DuplicateSourceError:
         raise HTTPException(
             status_code=409,
             detail="ADR with this title already exists, try using another one",
         )
 
-    result = await kb_index_document(request.content, source)
     return JSONResponse(content={"source": source, "result": result})
 
 
 @router.post("/index-document")
 async def index_document_endpoint(file: UploadFile = File(...), source: str = ""):
+    """Two intents behind one endpoint, told apart by whether `source` is supplied.
+
+    With a source: save an edit to that record. The edited H1 stays authoritative, so a
+    changed title renames the record rather than leaving its key stale.
+
+    Without one: create from an uploaded file, same rule as the template path."""
     content = await file.read()
     text = content.decode("utf-8")
-    source_name = source or file.filename
 
-    if not source_name:
-        return JSONResponse(
-            status_code=400, content={"error": "source name is required"}
+    if source:
+        try:
+            renamed, result = await kb_update_document(source, text)
+        except SourceDerivationError:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not derive a source: the document needs a top-level '# ' title.",
+            )
+        except DuplicateSourceError as conflict:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another ADR already covers '{conflict.source}' — pick a different title.",
+            )
+
+        return JSONResponse(content={"source": renamed, "result": result})
+
+    try:
+        source_name, result = await kb_create_document(text, file.filename)
+    except SourceDerivationError:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not derive a source: the file needs a top-level '# ' title or a usable filename.",
+        )
+    except DuplicateSourceError as conflict:
+        raise HTTPException(
+            status_code=409,
+            detail=f"An ADR matching '{conflict.source}' already exists — rename the file, or edit the existing record instead.",
         )
 
-    result = await kb_index_document(text, source_name)
-    return JSONResponse(content={"result": result})
+    return JSONResponse(content={"source": source_name, "result": result})
 
 
 @router.get("/next-id")

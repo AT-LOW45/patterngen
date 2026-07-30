@@ -4,7 +4,7 @@
 			<h1 class="text-2xl font-semibold mb-4">Knowledge Base</h1>
 			<Button label="Create ADR" aria-controls="create-adr-menu" aria-haspopup="true" @click="toggle" />
 		</div>
-		<div v-if="error" class="text-red-600 mb-4">{{ error }}</div>
+		<div v-if="error && !uploadError" class="text-red-600 mb-4">{{ error }}</div>
 		<div class="rounded-md p-5 bg-white shadow-sm mt-3">
 			<DataTable :value="records" :loading="loading" row-hover @row-click="onRowClick">
 				<template #empty>
@@ -46,16 +46,14 @@
 			:modal="true"
 			class="w-full"
 			style="width: 500px"
-			:dismissable-mask="!uploading"
+			:dismissable-mask="!uploading && !reviewing"
 		>
 			<div class="space-y-4">
-				<div>
-					<FormField label="Source Query String" :tip="{ message: 'the vector db will use this to index documents' }">
-						<InputText id="source" v-model="sourceInput" placeholder="Enter source" class="w-full" />
-					</FormField>
-				</div>
-				<div class="flex flex-col gap-5">
-					<Message severity="info">Only markdown and plain text files are supported</Message>
+				<div class="flex flex-col gap-5 pt-3">
+					<Message severity="info">
+						Only markdown and plain text files are supported. The record's ID is derived from the document's title, or from the filename if
+						it has none.
+					</Message>
 					<div class="flex flex-col gap-2">
 						<FileUpload
 							ref="fileUploadRef"
@@ -65,6 +63,7 @@
 							:show-upload-button="false"
 							:show-cancel-button="false"
 							@select="onFileSelect"
+							@clear="((error = null), (uploadError = false))"
 							:multiple="false"
 							accept=".md,text/markdown,text/plain"
 							:max-file-size="104857600"
@@ -88,23 +87,70 @@
 					</div>
 					<div v-if="selectedFile" class="mt-2 text-sm text-gray-600">Selected: {{ selectedFile.name }}</div>
 				</div>
+
+				<!-- Quality review, rendered inline rather than in ReviewFindingsDialog so the
+				     user keeps the source/file inputs in view while fixing the file. Advisory:
+				     every state leaves "Upload anyway" available. -->
+				<div v-if="reviewing" class="flex items-center gap-2 text-sm text-slate-500 dark:text-surface-400">
+					<i class="pi pi-spin pi-spinner" />
+					<span>Reviewing ADR quality…</span>
+				</div>
+
+				<Message v-else-if="reviewError" severity="warn" :closable="false">
+					Quality review unavailable — you can upload anyway and review later.
+				</Message>
+
+				<div v-else-if="reviewFindings.length" class="flex flex-col gap-2">
+					<span class="text-sm font-medium text-slate-600 dark:text-surface-300">Quality review found {{ reviewSummary }}</span>
+					<ul class="flex max-h-56 flex-col gap-2 overflow-y-auto pr-1">
+						<li
+							v-for="(finding, i) in reviewFindings"
+							:key="i"
+							class="flex gap-2 rounded-lg border border-l-4 border-slate-200 p-3 dark:border-surface-700"
+							:class="severityConfig(finding.severity).spine"
+						>
+							<i :class="[severityConfig(finding.severity).icon, severityConfig(finding.severity).fg, 'mt-0.5 shrink-0']" />
+							<div class="flex min-w-0 flex-col gap-0.5">
+								<span class="text-xs font-semibold uppercase tracking-wide" :class="severityConfig(finding.severity).fg">
+									{{ severityConfig(finding.severity).label }} · {{ finding.section }}
+								</span>
+								<p class="text-sm leading-relaxed text-slate-700 dark:text-surface-200">{{ finding.message }}</p>
+							</div>
+						</li>
+					</ul>
+				</div>
+
+				<div v-else-if="uploadError && error" class="text-red-500">
+					{{ error }}
+				</div>
+				<div v-else-if="reviewRan" class="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+					<i class="pi pi-check-circle" />
+					<span>No issues found</span>
+				</div>
 			</div>
 			<template #footer>
-				<Button label="Cancel" severity="secondary" icon="pi pi-times" text @click="dialogVisible = false" :disabled="uploading" />
-				<Button label="Upload" icon="pi pi-upload" :loading="uploading" @click="onUpload" />
+				<Button
+					label="Cancel"
+					severity="secondary"
+					icon="pi pi-times"
+					text
+					@click="dialogVisible = false"
+					:disabled="uploading || reviewing"
+				/>
+				<Button :label="uploadLabel" icon="pi pi-upload" :loading="uploading || reviewing" @click="onUpload" />
 			</template>
 		</Dialog>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { knowledgeBaseService, draftService } from "@/api-service";
-import FormField from "@/components/form/FormField.vue";
+import { knowledgeBaseService, draftService, reviewService, ReviewFinding } from "@/api-service";
 import ROUTES from "@/router/routes";
 import { downloadMarkdown } from "@/utils/download-markdown";
-import { Button, Column, DataTable, Dialog, FileUpload, InputText, Menu, Message, Tag, useConfirm, useToast } from "primevue";
+import axios from "axios";
+import { Button, Column, DataTable, Dialog, FileUpload, Menu, Message, Tag, useConfirm, useToast } from "primevue";
 import { MenuItem } from "primevue/menuitem";
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 interface KnowledgeBaseRecord {
@@ -122,12 +168,60 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedRecord = ref<KnowledgeBaseRecord | null>(null);
 const dialogVisible = ref(false);
-const sourceInput = ref("");
 const selectedFile = ref<File | null>(null);
 const uploading = ref(false);
 // Source name currently being fetched for download, so only that row spins.
 const downloading = ref<string | null>(null);
 const fileUploadRef = ref();
+const uploadError = ref(false);
+
+// Upload-dialog quality review. `reviewRan` distinguishes "not reviewed yet" from
+// "reviewed and clean", which is what turns the Upload button into "Upload anyway".
+const reviewing = ref(false);
+const reviewFindings = ref<ReviewFinding[]>([]);
+const reviewError = ref(false);
+const reviewRan = ref(false);
+
+const SEVERITY = {
+	error: {
+		label: "Error",
+		icon: "pi pi-times-circle",
+		fg: "text-rose-600 dark:text-rose-400",
+		spine: "border-l-rose-500",
+	},
+	warning: {
+		label: "Warning",
+		icon: "pi pi-exclamation-triangle",
+		fg: "text-amber-600 dark:text-amber-400",
+		spine: "border-l-amber-500",
+	},
+} as const;
+
+const severityConfig = (severity: ReviewFinding["severity"]) => SEVERITY[severity];
+
+const reviewSummary = computed<string>(() => {
+	const errors = reviewFindings.value.filter((f) => f.severity === "error").length;
+	const warnings = reviewFindings.value.filter((f) => f.severity === "warning").length;
+	const parts: string[] = [];
+	if (errors) parts.push(`${errors} error${errors > 1 ? "s" : ""}`);
+	if (warnings) parts.push(`${warnings} warning${warnings > 1 ? "s" : ""}`);
+	return parts.join(" · ");
+});
+
+// Once the review has flagged something (or couldn't run), the next click is the
+// user deliberately overriding it.
+const uploadLabel = computed<string>(() =>
+	reviewRan.value && (reviewFindings.value.length > 0 || reviewError.value) ? "Upload anyway" : "Upload",
+);
+
+const resetReview = () => {
+	reviewFindings.value = [];
+	reviewError.value = false;
+	reviewRan.value = false;
+};
+
+// A fresh dialog session starts unreviewed.
+watch(dialogVisible, () => resetReview());
 const menu = ref();
 const menuItems = ref<MenuItem[]>([
 	{
@@ -232,12 +326,15 @@ const onDelete = (record: KnowledgeBaseRecord) => {
 const onFileSelect = (event: any) => {
 	if (event.files && event.files.length > 0) {
 		selectedFile.value = event.files[0];
+		// Findings belong to the previous file's content.
+		resetReview();
 	}
 };
 
 const clearFile = () => {
 	selectedFile.value = null;
 	fileUploadRef.value?.clear();
+	resetReview();
 };
 
 const formatFileSize = (bytes: number): string => {
@@ -246,32 +343,72 @@ const formatFileSize = (bytes: number): string => {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const onUpload = async () => {
-	if (!sourceInput.value) {
-		error.value = "Please enter a source query string.";
-		return;
+// Reads the selected file and reviews its markdown. Returns true when it's clear to
+// upload without asking. Fail-safe: an unreadable file or a review outage sets
+// `reviewError` rather than blocking, mirroring the create/edit gates.
+const runReview = async (file: File): Promise<boolean> => {
+	reviewing.value = true;
+	try {
+		const content = await file.text();
+		const result = await reviewService.reviewDocument(content);
+		reviewFindings.value = result.data.findings;
+		return result.data.findings.length === 0;
+	} catch (err) {
+		console.error("ADR review failed:", err);
+		reviewError.value = true;
+		return false;
+	} finally {
+		reviewing.value = false;
+		reviewRan.value = true;
 	}
-	if (!selectedFile.value) {
-		error.value = "Please select a file to upload.";
-		return;
-	}
+};
+
+const doUpload = async (file: File) => {
+	uploadError.value = false;
 	uploading.value = true;
 	error.value = null;
 	try {
-		await knowledgeBaseService.indexDocument(sourceInput.value, selectedFile.value);
-		sourceInput.value = "";
+		// The backend derives and returns the source key — nothing is sent for it.
+		const { data } = await knowledgeBaseService.indexDocument(file);
 		selectedFile.value = null;
 		if (fileUploadRef.value) {
 			fileUploadRef.value.clear();
 		}
+		resetReview();
 		fetchRecords();
 		dialogVisible.value = false;
-		toast.add({ severity: "success", summary: "Uploaded record", life: 3000 });
+		toast.add({ severity: "success", summary: "Uploaded record", detail: data.source, life: 3000 });
 	} catch (err) {
-		error.value = err instanceof Error ? err.message : "Failed to upload file";
+		// A derivation failure (400) or an existing record (409) explains itself in `detail`.
+		const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined;
+		error.value = detail ?? (err instanceof Error ? err.message : "Failed to upload file");
+		uploadError.value = true;
 	} finally {
 		uploading.value = false;
 	}
+};
+
+const onUpload = async () => {
+	if (!selectedFile.value) {
+		error.value = "Please select a file to upload.";
+		return;
+	}
+
+	const file = selectedFile.value;
+
+	// Second click on "Upload anyway" — the user has seen the findings and chose to proceed.
+	if (reviewRan.value) {
+		await doUpload(file);
+		return;
+	}
+
+	error.value = null;
+	const clean = await runReview(file);
+	// Not clean: findings (or the unavailable notice) render inline and the button
+	// becomes "Upload anyway". Nothing is uploaded yet.
+	if (!clean) return;
+
+	await doUpload(file);
 };
 
 onMounted(() => {

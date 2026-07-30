@@ -13,11 +13,13 @@ export const knowledgeBaseService = {
 	getRawRecord: (source: string) => api.get(`/knowledge-base/${encodeURIComponent(source)}/raw`),
 	deleteRecord: (source: string) => api.delete(`/knowledge-base/${source}`),
 
-	// POST /index-document?source=<source> with multipart form data containing file
-	indexDocument: (source: string, file: File) => {
+	// Create a record from an uploaded file. No `source` is sent — the backend derives it
+	// (H1 if the document has one, else the filename plus a fresh ADR id) and 409s rather
+	// than overwriting an existing record. Returns the key it settled on.
+	indexDocument: (file: File) => {
 		const form = new FormData();
 		form.append("file", file);
-		return api.post(`/knowledge-base/index-document?source=${encodeURIComponent(source)}`, form, {
+		return api.post<{ source: string }>("/knowledge-base/index-document", form, {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},
@@ -29,14 +31,15 @@ export const knowledgeBaseService = {
 	// the document's H1 title and returns it, then writes to blob + indexes.
 	createDocument: (content: string) => api.post<{ source: string }>("/knowledge-base", { content }),
 
-	// Persist a markdown string under a known `source` — used for re-indexing an
-	// edited record (stable identity). The backend writes to blob + re-indexes.
+	// Save an edit to a known record. The backend treats the document's H1 as
+	// authoritative, so changing the title renames the record — the returned `source` is
+	// the key it now lives under and may differ from the one passed in.
 	saveMarkdown: (source: string, content: string) => {
 		const blob = new Blob([content], { type: "text/markdown" });
 		const file = new File([blob], source, { type: "text/markdown" });
 		const form = new FormData();
 		form.append("file", file);
-		return api.post(`/knowledge-base/index-document?source=${encodeURIComponent(source)}`, form, {
+		return api.post<{ source: string }>(`/knowledge-base/index-document?source=${encodeURIComponent(source)}`, form, {
 			headers: { "Content-Type": "multipart/form-data" },
 		});
 	},

@@ -6,9 +6,19 @@
 				<h1 class="text-xl font-medium text-slate-700 dark:text-surface-100">Create ADR</h1>
 				<p class="text-slate-500 dark:text-surface-400">Fill in the decision record — the preview on the right updates as you type.</p>
 			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				<span class="font-mono text-sm text-slate-400">{{ form.id || "Assigning ID…" }}</span>
-				<Tag v-if="form.status" :value="form.status" :severity="statusSeverity" />
+			<div class="flex flex-col items-end gap-1 shrink-0">
+				<div class="flex items-center gap-2">
+					<span class="font-mono text-sm text-slate-400">{{ form.id || "Assigning ID…" }}</span>
+					<Tag v-if="form.status" :value="form.status" :severity="statusSeverity" />
+				</div>
+				<!-- The server assigns the real id on create, so this one can shift if another
+				     ADR lands first (or if this page/draft has been open a while). -->
+				<div class="flex items-center gap-2">
+					<Icon icon="material-symbols:info" />
+					<span v-if="form.id" class="text-sm text-slate-400 dark:text-surface-400">
+						Temporary — the final ID is assigned when you create the ADR.
+					</span>
+				</div>
 			</div>
 		</div>
 
@@ -271,6 +281,7 @@
 import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
 import FormField from "@/components/form/FormField.vue";
 import { useCreateAdr } from "@/composables/useCreateAdr";
+import { Icon } from '@iconify/vue';
 import { MdEditor, MdPreview } from "md-editor-v3";
 import { Button, Chip, Dialog, InputText, Select, SelectButton, Tag, Textarea } from "primevue";
 

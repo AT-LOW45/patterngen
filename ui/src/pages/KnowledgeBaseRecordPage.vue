@@ -59,6 +59,7 @@
 import { knowledgeBaseService, ReviewFinding, reviewService } from "@/api-service";
 import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
 import { downloadMarkdown } from "@/utils/download-markdown";
+import axios from "axios";
 import { MdEditor } from "md-editor-v3";
 import { Button, Select, useToast } from "primevue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -183,6 +184,36 @@ const hasAdrErrors = async () => {
 	}
 };
 
+// Saves the editor buffer and follows a rename: editing the H1 moves the record to a new
+// source key, so the list entry, selection and route all have to point at the new one.
+const save = async () => {
+	const previous = currentRecord.value;
+	const { data } = await knowledgeBaseService.saveMarkdown(previous, editorText.value);
+
+	if (data.source !== previous) {
+		const index = records.value.indexOf(previous);
+		if (index !== -1) {
+			records.value[index] = data.source;
+		}
+		// Assigning currentRecord refetches via its watcher; `replace` so the back button
+		// doesn't return to a key that no longer exists.
+		currentRecord.value = data.source;
+		router.replace(`/knowledge-base/${encodeURIComponent(data.source)}`);
+	} else {
+		// The server restamps the ADR id, so what's stored can differ from what was typed.
+		// Pull it back so the editor shows the canonical version rather than a stale edit.
+		await fetchRecord(previous);
+	}
+
+	toast.add({ severity: "success", summary: "Record reindexed", detail: data.source, life: 3000 });
+};
+
+const onSaveFailed = (error: unknown) => {
+	console.error("Failed to reindex record:", error);
+	const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+	toast.add({ severity: "error", summary: "Failed to reindex record", detail, life: 4000 });
+};
+
 const onSave = async () => {
 	saving.value = true;
 	try {
@@ -190,11 +221,9 @@ const onSave = async () => {
 		if (needsAmendment) return;
 		reviewDialogOpen.value = false;
 
-		await knowledgeBaseService.saveMarkdown(currentRecord.value, editorText.value);
-		toast.add({ severity: "success", summary: "Record reindexed", life: 3000 });
+		await save();
 	} catch (error) {
-		console.error("Failed to reindex record:", error);
-		toast.add({ severity: "error", summary: "Failed to reindex record", life: 3000 });
+		onSaveFailed(error);
 	} finally {
 		saving.value = false;
 	}
@@ -204,11 +233,9 @@ const onSave = async () => {
 const onSubmitAnyway = async () => {
 	try {
 		saving.value = true;
-		await knowledgeBaseService.saveMarkdown(currentRecord.value, editorText.value);
-		toast.add({ severity: "success", summary: "Record reindexed", life: 3000 });
+		await save();
 	} catch (error) {
-		console.error("Failed to reindex record:", error);
-		toast.add({ severity: "error", summary: "Failed to reindex record", life: 3000 });
+		onSaveFailed(error);
 	} finally {
 		saving.value = false;
 	}
