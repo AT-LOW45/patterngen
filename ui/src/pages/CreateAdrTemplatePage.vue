@@ -101,8 +101,19 @@
 						</div>
 					</FormField>
 
-					<FormField label="Related ADRs" :tip="{ message: 'Comma-separated IDs of related decisions.' }">
-						<InputText v-model="form.relatedAdrs" placeholder="e.g. ADR-001, ADR-002" fluid />
+					<FormField label="Related ADRs" :tip="{ message: 'Existing records in the knowledge base that this decision relates to.' }">
+						<MultiSelect
+							v-model="form.relatedAdrs"
+							:options="relatedAdrChoices"
+							:loading="loadingRelatedAdrs"
+							placeholder="Select related ADRs"
+							display="chip"
+							filter
+							:show-toggle-all="false"
+							empty-message="No other ADRs yet"
+							empty-filter-message="No match"
+							fluid
+						/>
 					</FormField>
 				</section>
 
@@ -283,7 +294,7 @@ import FormField from "@/components/form/FormField.vue";
 import { useCreateAdr } from "@/composables/useCreateAdr";
 import { Icon } from '@iconify/vue';
 import { MdEditor, MdPreview } from "md-editor-v3";
-import { Button, Chip, Dialog, InputText, Select, SelectButton, Tag, Textarea } from "primevue";
+import { Button, Chip, Dialog, InputText, MultiSelect, Select, SelectButton, Tag, Textarea } from "primevue";
 
 const {
 	form,
@@ -297,6 +308,8 @@ const {
 	statusOptions,
 	formatOptions,
 	mdToolbars,
+	relatedAdrChoices,
+	loadingRelatedAdrs,
 	addAlternative,
 	addCustomSection,
 	removeCustomSection,

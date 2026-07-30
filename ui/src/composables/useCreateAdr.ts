@@ -24,7 +24,8 @@ export interface AdrForm {
 	context: string;
 	decision: string;
 	alternatives: string[];
-	relatedAdrs: string;
+	/** Source keys of existing records, picked from the knowledge base. */
+	relatedAdrs: string[];
 	implementation: string;
 	customSections: CustomSection[];
 	positiveConsequences: string;
@@ -75,13 +76,32 @@ function emptyForm(): AdrForm {
 		context: "",
 		decision: "",
 		alternatives: [],
-		relatedAdrs: "",
+		relatedAdrs: [],
 		implementation: "",
 		customSections: [],
 		positiveConsequences: "",
 		negativeConsequences: "",
 		notes: "",
 	};
+}
+
+/**
+ * Drafts saved before Related ADRs became a picker hold a comma-separated string.
+ * Coerce so resuming one doesn't put a string into an array-typed field.
+ */
+function normalizeRelatedAdrs(draft: AdrForm): AdrForm {
+	const related: unknown = draft.relatedAdrs;
+	if (Array.isArray(related)) {
+		return draft;
+	}
+	const parsed =
+		typeof related === "string"
+			? related
+					.split(",")
+					.map((entry) => entry.trim())
+					.filter(Boolean)
+			: [];
+	return { ...draft, relatedAdrs: parsed };
 }
 
 /**
@@ -158,8 +178,8 @@ export function useCreateAdr() {
 		if (f.alternatives.length) {
 			lines.push("", "### Alternatives Considered", ...f.alternatives.map((a) => `- ${a}`));
 		}
-		if (f.relatedAdrs.trim()) {
-			lines.push("", "### Related ADRs", f.relatedAdrs.trim());
+		if (f.relatedAdrs.length) {
+			lines.push("", "### Related ADRs", ...f.relatedAdrs.map((source) => `- ${source}`));
 		}
 
 		if (f.implementation.trim()) {
@@ -210,14 +230,45 @@ export function useCreateAdr() {
 		}
 	};
 
+	// Existing records, for the Related ADRs picker.
+	const relatedAdrOptions = ref<string[]>([]);
+	const loadingRelatedAdrs = ref<boolean>(false);
+
+	const loadRelatedAdrOptions = async (): Promise<void> => {
+		loadingRelatedAdrs.value = true;
+		try {
+			const { data } = await knowledgeBaseService.getAllRecords();
+			relatedAdrOptions.value = data.sources ?? [];
+		} catch (error) {
+			console.error("Failed to load existing ADRs:", error);
+			toast.add({
+				severity: "warn",
+				summary: "Couldn't load existing ADRs",
+				detail: "Related ADRs can't be picked right now.",
+				life: 4000,
+			});
+		} finally {
+			loadingRelatedAdrs.value = false;
+		}
+	};
+
+	// A resumed draft can reference a record that has since been deleted or renamed. Merge
+	// those in so the selection stays visible instead of silently vanishing from the chips.
+	const relatedAdrChoices = computed<string[]>(() =>
+		[...new Set([...relatedAdrOptions.value, ...form.value.relatedAdrs])].sort(),
+	);
+
 	// Resume an existing draft when ?draft=<id> is present; otherwise start fresh with
 	// a backend-assigned next id. Snapshot the result as the pristine baseline.
 	onMounted(async () => {
+		// Independent of the form — let it load alongside rather than gating the page on it.
+		void loadRelatedAdrOptions();
+
 		const resumeId = typeof route.query.draft === "string" ? route.query.draft : null;
 		if (resumeId) {
 			try {
 				const { data } = await draftService.getDraft(resumeId);
-				form.value = { ...emptyForm(), ...data.draft };
+				form.value = normalizeRelatedAdrs({ ...emptyForm(), ...data.draft });
 				draftId.value = resumeId;
 			} catch (error) {
 				console.error("Failed to load draft:", error);
@@ -401,6 +452,8 @@ export function useCreateAdr() {
 		statusOptions,
 		formatOptions,
 		mdToolbars,
+		relatedAdrChoices,
+		loadingRelatedAdrs,
 		// actions
 		addAlternative,
 		addCustomSection,
