@@ -238,7 +238,7 @@ export function useCreateAdr() {
 		loadingRelatedAdrs.value = true;
 		try {
 			const { data } = await knowledgeBaseService.getAllRecords();
-			relatedAdrOptions.value = data.sources ?? [];
+			relatedAdrOptions.value = data.records.map((record) => record.adr_id).filter(Boolean);
 		} catch (error) {
 			console.error("Failed to load existing ADRs:", error);
 			toast.add({

@@ -3,18 +3,23 @@ import re
 
 from langchain_core.documents import Document
 from langchain_core.indexing import IndexingResult
-from db.chroma_helper import add_to_index, list_sources, get_chunks, delete_from_index
+from db.chroma_helper import (
+    add_to_index,
+    list_sources,
+    list_records,
+    get_adr_id,
+    get_chunks,
+    delete_from_index,
+)
 from exception.source_error import DuplicateSourceError, SourceDerivationError
 from storage.blob_storage import upload_to_blob, get_from_blob, delete_from_blob
 
 
 def next_adr_id() -> str:
-    """Next sequential ADR id (e.g. 'ADR-004') based on existing source keys like 'adr-003-...'."""
+    """Next sequential ADR id (e.g. 'ADR-004'), from the adr_id recorded in metadata."""
     highest = 0
-    for source in list_sources():
-        # Case-insensitive: a source keyed 'ADR-004-...' must still consume its number,
-        # otherwise the id gets handed out twice.
-        match = re.match(r"adr-0*(\d+)", source, re.IGNORECASE)
+    for record in list_records():
+        match = re.match(r"adr-0*(\d+)", record["adr_id"], re.IGNORECASE)
         if match:
             highest = max(highest, int(match.group(1)))
     return f"ADR-{highest + 1:03d}"
@@ -27,35 +32,29 @@ def slugify(value: str) -> str:
     return value.strip("-")
 
 
-def _title_slug(source: str) -> str:
-    """Source key with the leading 'adr-<n>-' id prefix removed, so titles compare regardless of id."""
-    return re.sub(r"^adr-\d+-", "", source)
-
-
 def source_exist(source: str, exclude: str | None = None) -> bool:
     """
-    Whether a record already covers this title (ids ignored, so 'adr-004-auth' and
-    'adr-009-auth' count as the same). `exclude` skips one existing source — used when
-    renaming, so a record isn't reported as conflicting with itself.
+    Whether a record already uses this source key. `exclude` skips one existing source —
+    used when renaming, so a record isn't reported as conflicting with itself.
+
+    The source is the title-derived key (the ADR number lives in metadata, not the key),
+    so this is a plain equality check.
     """
-    target = _title_slug(source)
-    return any(
-        _title_slug(existing) == target
-        for existing in list_sources()
-        if existing != exclude
-    )
+    return any(existing == source for existing in list_sources() if existing != exclude)
 
 
 def generate_source(content: str) -> str:
     """
-    Derive a stable source key from the document's first H1 heading.
-    Returns "" if the document has no H1 (caller decides how to handle).
+    Derive a stable source key from the document's H1 — the TITLE only, with any
+    'ADR-NNN:' prefix stripped (the number is metadata, not part of identity). This must
+    stay equal to what stamp_adr_id returns, so a key can always be rebuilt from stored
+    markdown (e.g. by seed_adrs.py). Returns "" if the document has no H1.
     """
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("# "):
-            return slugify(stripped[2:])
-    return ""
+    found = _find_h1(content)
+    if not found:
+        return ""
+    title = ADR_ID_PREFIX.sub("", found[1]).strip()
+    return slugify(title)
 
 
 # An 'ADR-4', 'adr_012:', 'ADR 7 — ' style id at the start of a heading or filename.
@@ -133,7 +132,9 @@ def stamp_adr_id(
             return "", ""
         lines = [f"# {adr_id}: {title}", "", *lines]
 
-    return "\n".join(lines), slugify(f"{adr_id}: {title}")
+    # The number stays in the H1 for display, but NOT in the source key — identity is
+    # the title alone (generate_source strips the same 'ADR-NNN:' prefix).
+    return "\n".join(lines), slugify(title)
 
 
 async def create_document(
@@ -174,7 +175,7 @@ async def update_document(source: str, content: str) -> tuple[str, IndexingResul
     Indexes before deleting, so a failure midway leaves a duplicate (recoverable) rather
     than losing the record.
     """
-    adr_id = parse_adr_id(source) or next_adr_id()
+    adr_id = get_adr_id(source) or next_adr_id()
 
     stamped, new_source = stamp_adr_id(content, adr_id)
     if not new_source:
@@ -206,9 +207,9 @@ async def index_document(content: str, source: str) -> IndexingResult:
     return result
 
 
-def list_documents() -> list[str]:
-    """All indexed source keys."""
-    return list_sources()
+def list_documents() -> list[dict]:
+    """All records as {source, adr_id, title}, ordered by ADR id."""
+    return list_records()
 
 
 def get_document_raw(source: str) -> str:

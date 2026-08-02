@@ -121,7 +121,7 @@ watch(recordData, (newData) => {
 onMounted(async () => {
 	try {
 		const response = await knowledgeBaseService.getAllRecords();
-		records.value = response.data.sources || [];
+		records.value = response.data.records.map((r) => r.source);
 		// Initialize to record from route param, or first record if not found
 		const recordIdFromRoute = route.params.id as string;
 		if (recordIdFromRoute && records.value.includes(recordIdFromRoute)) {

@@ -100,7 +100,7 @@ async def get_document_raw_endpoint(source: str):
 
 @router.get("")
 async def list_documents_endpoint():
-    return JSONResponse(content={"sources": list_documents()})
+    return JSONResponse(content={"records": list_documents()})
 
 
 @router.get("/{source}")

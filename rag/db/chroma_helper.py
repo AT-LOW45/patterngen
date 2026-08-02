@@ -137,6 +137,33 @@ def list_sources() -> list[str]:
     return sorted({m.get("source", "") for m in results["metadatas"] if m.get("source")})
 
 
+def list_records() -> list[dict]:
+    """One entry per source — {source, adr_id, title} — ordered by adr_id.
+
+    The ADR number lives in metadata (not the source key), so ordering and display
+    read it from here rather than parsing the key.
+    """
+    records: dict[str, dict] = {}
+    for metadata in vector_store.get()["metadatas"]:
+        source = metadata.get("source")
+        if not source or source in records:
+            continue
+        records[source] = {
+            "source": source,
+            "adr_id": metadata.get("adr_id", ""),
+            "title": metadata.get("title", source),
+        }
+    return sorted(records.values(), key=lambda r: r["adr_id"])
+
+
+def get_adr_id(source: str) -> str:
+    """The ADR id recorded for a source, or "" if it has none."""
+    for metadata in vector_store.get(where={"source": source})["metadatas"]:
+        if metadata.get("adr_id"):
+            return metadata["adr_id"]
+    return ""
+
+
 def get_chunks(source: str) -> list[str]:
     """All stored chunk texts for one source."""
     results = vector_store.get(where={"source": source})

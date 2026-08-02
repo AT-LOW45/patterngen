@@ -43,7 +43,8 @@ async def main() -> None:
         if not source:
             print(f"  ! skipped {path.name} — no '# ' H1 title to derive a source from")
             continue
-        await index_document(content, source)
+        result = await index_document(content, source)
+        print(result)
         print(f"  ✓ seeded {source}  ({path.name})")
 
     print(f"Done — {len(files)} ADR file(s) processed.")

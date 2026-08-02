@@ -19,5 +19,8 @@ __pycache__/
 rag/chroma_db/
 rag/record_manager.db
 
+rag/scripts/chroma_db
+rag/scripts/record_manager.db
+
 # MCP config holds a GitHub PAT — keep it local, never commit/sync it.
 .mcp.json

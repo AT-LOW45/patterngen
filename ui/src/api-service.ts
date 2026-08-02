@@ -7,8 +7,12 @@ const axiosConfig: CreateAxiosDefaults = {
 
 const api = axios.create(axiosConfig);
 
+// A published record. `source` is the identity key (title slug); `adr_id`/`title`
+// come from metadata — the ADR number is no longer part of the key.
+export type AdrRecord = { source: string; adr_id: string; title: string };
+
 export const knowledgeBaseService = {
-	getAllRecords: () => api.get("/knowledge-base"),
+	getAllRecords: () => api.get<{ records: AdrRecord[] }>("/knowledge-base"),
 	getRecord: (source: string) => api.get(`knowledge-base/${source}`),
 	getRawRecord: (source: string) => api.get(`/knowledge-base/${encodeURIComponent(source)}/raw`),
 	deleteRecord: (source: string) => api.delete(`/knowledge-base/${source}`),

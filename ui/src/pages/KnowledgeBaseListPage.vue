@@ -28,7 +28,7 @@
 								severity="secondary"
 								icon="pi pi-download"
 								v-tooltip.top="'Download as markdown'"
-								:loading="downloading === data.name"
+								:loading="downloading === data.source"
 								@click.stop="onDownload(data)"
 							/>
 							<Button text severity="danger" icon="pi pi-trash" @click="onDelete(data)" />
@@ -154,9 +154,10 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 interface KnowledgeBaseRecord {
-	name: string;
+	name: string; // display label
 	isDraft: boolean;
-	draftId?: string;
+	draftId?: string; // drafts
+	source?: string; // published records — the identity key used for all operations
 }
 
 const confirm = useConfirm();
@@ -256,8 +257,9 @@ const fetchRecords = async () => {
 			isDraft: true,
 			draftId: d.id,
 		}));
-		const publishedRows: KnowledgeBaseRecord[] = published.data.sources.map((source: string) => ({
-			name: source,
+		const publishedRows: KnowledgeBaseRecord[] = published.data.records.map((record) => ({
+			name: record.title || record.source,
+			source: record.source,
 			isDraft: false,
 		}));
 
@@ -276,7 +278,7 @@ const onRowClick = (event: any) => {
 		// resume the draft in the create page
 		router.push({ path: ROUTES.knowledgeBaseCreate, query: { draft: row.draftId } });
 	} else {
-		router.push({ name: "KnowledgeBaseRecord", params: { id: row.name } });
+		router.push({ name: "KnowledgeBaseRecord", params: { id: row.source } });
 	}
 };
 
@@ -284,10 +286,11 @@ const onRowClick = (event: any) => {
 // to the browser. `@click.stop` on the button keeps the row-click navigation from
 // firing alongside the download.
 const onDownload = async (record: KnowledgeBaseRecord) => {
-	downloading.value = record.name;
+	const source = record.source ?? record.name;
+	downloading.value = source;
 	try {
-		const { data } = await knowledgeBaseService.getRawRecord(record.name);
-		downloadMarkdown(record.name, data.content);
+		const { data } = await knowledgeBaseService.getRawRecord(source);
+		downloadMarkdown(source, data.content);
 	} catch (err) {
 		toast.add({ severity: "error", summary: "Failed to download record", detail: record.name, life: 3000 });
 	} finally {
@@ -311,7 +314,7 @@ const onDelete = (record: KnowledgeBaseRecord) => {
 				if (record.isDraft && record.draftId) {
 					await draftService.deleteDraft(record.draftId);
 				} else {
-					await knowledgeBaseService.deleteRecord(record.name);
+					await knowledgeBaseService.deleteRecord(record.source ?? record.name);
 				}
 				fetchRecords();
 			} catch (err) {
