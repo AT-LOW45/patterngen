@@ -4,6 +4,7 @@ import * as dotenv from "dotenv";
 import * as vscode from "vscode";
 import generateBoilerplate from "./commands/generate-boilerplate";
 import openKnowledgeBase from './commands/open-knowledge-base';
+import symbolSpike from "./commands/symbol-spike";
 import wrapInTryCatch from "./commands/wrap-in-try-catch";
 import COMMANDS from "./constants/commands";
 
@@ -22,6 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
 		registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)),
 		registerCommand(COMMANDS.generateBoilerPlate.id, () => generateBoilerplate(context)),
 		registerCommand(COMMANDS.openKnowledgeBase.id, () => openKnowledgeBase()),
+		registerCommand(COMMANDS.symbolSpike.id, () => symbolSpike(context)),
 	);
 }
 

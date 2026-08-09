@@ -7,6 +7,9 @@ const COMMANDS = {
 	},
 	openKnowledgeBase: {
 		id: "patterngen.openKnowledgeBase"
+	},
+	symbolSpike: {
+		id: "patterngen.symbolSpike"
 	}
 } as const;
 

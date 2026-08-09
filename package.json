@@ -37,6 +37,10 @@
 			{
 				"command": "patterngen.openKnowledgeBase",
 				"title": "Open Knowledge Base"
+			},
+			{
+				"command": "patterngen.symbolSpike",
+				"title": "Patterngen: Symbol Spike (debug)"
 			}
 		]
 	},
