@@ -33,6 +33,11 @@ const routes: CreateRouterRoutes = [
 				name: "KnowledgeBaseCreate",
 				component: () => import("@/pages/CreateAdrTemplatePage.vue"),
 			},
+			{
+				path: ROUTES.adrConfig,
+				name: "ADRConfig",
+				component: () => import("@/pages/AdrConfigPage.vue"),
+			},
 		],
 	},
 ];

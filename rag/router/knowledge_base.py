@@ -21,7 +21,7 @@ router = APIRouter(prefix="/knowledge-base", tags=["Knowledge Base"])
 
 @router.post("")
 async def create_document_endpoint(request: CreateDocumentRequest):
-    """Create a new record. The source key is derived server-side from the
+    """Create a new record through UI template. The source key is derived server-side from the
     document's H1 title — callers do not supply it."""
     try:
         source, result = await kb_create_document(request.content)
