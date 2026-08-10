@@ -1,3 +1,4 @@
+from pathlib import Path
 
 from langchain_chroma.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -6,8 +7,14 @@ from langchain_core.documents import Document
 from langchain_core.indexing import IndexingResult, index
 from langchain_classic.indexes import SQLRecordManager
 
-CHROMA_DB_PATH = "./chroma_db"
-RECORD_MANAGER_DB = "sqlite:///./record_manager.db"
+# Anchored to this file's location rather than a bare "./chroma_db" — a relative path
+# resolves against the process's cwd, so running a script from rag/scripts instead of
+# rag/ would silently open (or create) a second, empty store. See rekey_sources.py.
+_RAG_DIR = Path(__file__).resolve().parent.parent
+CHROMA_DB_PATH = str(_RAG_DIR / "chroma_db")
+# .as_posix() (forward slashes) rather than str() — SQLAlchemy's sqlite URL scheme
+# breaks on Windows-style backslashes in the path.
+RECORD_MANAGER_DB = f"sqlite:///{(_RAG_DIR / 'record_manager.db').as_posix()}"
 NAMESPACE = "chroma/patterngen"
 
 # bge-base-en-v1.5 is a stronger, code/architecture-aware retrieval model than
