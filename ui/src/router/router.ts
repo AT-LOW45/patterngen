@@ -1,4 +1,4 @@
-import AppLayout from "@/components/layout/AppLayout.vue";
+    import AppLayout from "@/components/layout/AppLayout.vue";
 import { createRouter, createWebHistory } from "vue-router";
 import ROUTES from "./routes";
 

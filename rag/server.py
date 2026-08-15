@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from router import boilerplate, knowledge_base, draft
+from router import boilerplate, knowledge_base, draft, system
 
 app = FastAPI()
 
@@ -17,5 +17,6 @@ app.add_middleware(
 app.include_router(draft.router)
 app.include_router(knowledge_base.router)
 app.include_router(boilerplate.router)
+app.include_router(system.router)
 
 app.mount("/", StaticFiles(directory="../ui/dist", html=True), name="ui")
