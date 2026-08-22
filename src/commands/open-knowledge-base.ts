@@ -9,8 +9,8 @@ export default function openKnowledgeBase() {
 		return;
 	}
 
-	// Open the configured endpoint as-is. Decomposing it into scheme/authority/path
-	// and rebuilding via Uri.from was dropping the :8000 port, so it opened
-	// http://127.0.0.1 (port 80) and failed with a network error.
+	// Open the configured endpoint as-is rather than decomposing it into
+	// scheme/authority/path and rebuilding — parsing the whole string preserves the
+	// full URL (incl. any query/fragment) and won't throw on a malformed setting.
 	vscode.env.openExternal(vscode.Uri.parse(ragBaseUrl));
 }
