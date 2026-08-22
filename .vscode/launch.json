@@ -15,6 +15,10 @@
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
 			],
+			"skipFiles": [
+				"<node_internals>/**",
+				"**/node_modules/**"
+			],
 			"preLaunchTask": "${defaultBuildTask}"
 		}
 	]
