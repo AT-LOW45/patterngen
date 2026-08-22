@@ -6,6 +6,7 @@ const ragBaseUrl = config.get<string>("ragEndpoint");
 
 const axiosConfig: CreateAxiosDefaults = {
 	baseURL: ragBaseUrl,
+	timeout: 5000,
 };
 
 const ragApi = axios.create(axiosConfig);
