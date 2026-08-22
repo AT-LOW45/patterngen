@@ -12,8 +12,11 @@ def _get_groq_llm() -> ChatGroq:
     if not api_key:
         raise ValueError("GROQ_API_KEY not available.")
 
+    # Model id is env-overridable so a Groq deprecation is a config change, not a
+    # code edit. Must support structured output (used by the ADR review feature).
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     return ChatGroq(
-        model="llama-3.3-70b-versatile", temperature=0.0, api_key=SecretStr(api_key)
+        model=model, temperature=0.0, api_key=SecretStr(api_key)
     )
 
 
