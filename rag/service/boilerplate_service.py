@@ -35,7 +35,7 @@ async def run_generate_boilerplate(request: GenerateBoilerplateRequest) -> str:
         [
             (
                 "system",
-                "You are a code generator for {language}. Generate code that strictly follows these company coding standards:\n\n{context}\n\n{selection_note}\n\n. If the standards include examples in multiple languages, only use the {language} implementation. Return only the code, no explanations, no markdown code fences.",
+                "You are a code generator for {language}. Generate code that strictly follows these company coding standards:\n\n{context}\n\n{selection_note}\n\n. If the standards include examples in multiple languages, only use the {language} implementation. Do NOT write import statements — assume every symbol you use is already imported or will be imported automatically by the editor; just reference the symbols directly by name. Return only the code, no explanations, no markdown code fences.",
             ),
             ("human", "{prompt}"),
         ]
