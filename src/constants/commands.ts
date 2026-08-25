@@ -2,8 +2,8 @@ const COMMANDS = {
 	tryCatch: {
 		id: "patterngen.tryCatch",
 	},
-	generateBoilerPlate: {
-		id: "patterngen.generateBoilerplate",
+	generateCode: {
+		id: "patterngen.generateCode",
 	},
 	openKnowledgeBase: {
 		id: "patterngen.openKnowledgeBase"

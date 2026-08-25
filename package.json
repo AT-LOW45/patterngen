@@ -31,8 +31,8 @@
 				"title": "Wrap Selection in try/catch"
 			},
 			{
-				"command": "patterngen.generateBoilerplate",
-				"title": "Generate Boilerplate"
+				"command": "patterngen.generateCode",
+				"title": "Generate Code"
 			},
 			{
 				"command": "patterngen.openKnowledgeBase",

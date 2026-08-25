@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as dotenv from "dotenv";
 import * as vscode from "vscode";
-import generateBoilerplate from "./commands/generate-boilerplate";
+import generateCode from "./commands/generate-code";
 import openKnowledgeBase from "./commands/open-knowledge-base";
 import symbolSpike from "./commands/symbol-spike";
 import wrapInTryCatch from "./commands/wrap-in-try-catch";
@@ -23,8 +23,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)),
 		registerCommand(
-			COMMANDS.generateBoilerPlate.id,
-			withBackendReady(() => generateBoilerplate(context)),
+			COMMANDS.generateCode.id,
+			withBackendReady(() => generateCode(context)),
 		),
 		registerCommand(
 			COMMANDS.openKnowledgeBase.id,
