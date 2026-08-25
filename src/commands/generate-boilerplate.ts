@@ -55,14 +55,55 @@ async function applyAddMissingImports(document: vscode.TextDocument): Promise<bo
 	return false;
 }
 
+interface BoilerplateEdit {
+	search: string;
+	replace: string;
+}
+
+// Apply the model's edit. Prefer its `search` anchor — locate that exact text in the
+// file and replace it — then fall back to the user's selection, then the cursor.
+async function applyBoilerplateEdit(
+	editor: vscode.TextEditor,
+	selection: vscode.Selection,
+	edit: BoilerplateEdit,
+): Promise<boolean> {
+	const document = editor.document;
+	let target: vscode.Range | undefined;
+
+	if (edit.search) {
+		const offset = document.getText().indexOf(edit.search);
+		if (offset !== -1) {
+			target = new vscode.Range(
+				document.positionAt(offset),
+				document.positionAt(offset + edit.search.length),
+			);
+		} else {
+			vscode.window.showWarningMessage(
+				"Patterngen: couldn't locate the code to change — applying at the selection/cursor instead.",
+			);
+		}
+	}
+
+	return editor.edit((editBuilder) => {
+		if (target) {
+			editBuilder.replace(target, edit.replace);
+		} else if (!selection.isEmpty) {
+			editBuilder.replace(selection, edit.replace);
+		} else {
+			editBuilder.insert(selection.active, edit.replace);
+		}
+	});
+}
+
 export default async function generateBoilerplate(context: vscode.ExtensionContext) {
 	try {
-		// capture editor first, before any dialogs
+		// capture editor + selection first, before any dialogs shift focus
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
 			vscode.window.showWarningMessage("No active editor found");
 			return;
 		}
+		const selection = editor.selection;
 
 		const input = await vscode.window.showInputBox({
 			prompt: "What do you want to generate?",
@@ -73,7 +114,7 @@ export default async function generateBoilerplate(context: vscode.ExtensionConte
 			return;
 		}
 
-		const code = await vscode.window.withProgress(
+		const edit = await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
 				title: "Patterngen: generating boilerplate...",
@@ -81,18 +122,23 @@ export default async function generateBoilerplate(context: vscode.ExtensionConte
 			},
 			async () => {
 				const language = editor.document.languageId;
-				const selectedText = editor.document.getText(editor.selection);
-				const response = await boilerplateService.generateBoilerplate(input, language, selectedText);
-				return response.data.code;
+				const selectedText = editor.document.getText(selection);
+				const fileContent = editor.document.getText();
+				const response = await boilerplateService.generateBoilerplate(
+					input,
+					language,
+					selectedText,
+					fileContent,
+				);
+				return response.data as BoilerplateEdit;
 			},
 		);
 
-		const inserted = await editor.edit((editBuilder) => {
-			editBuilder.insert(editor.selection.active, code);
-		});
+		// locate where the edit goes from its `search` anchor (falls back to selection/cursor)
+		const applied = await applyBoilerplateEdit(editor, selection, edit);
 
 		// generated code omits imports by design — let the editor add the correct ones
-		if (inserted) {
+		if (applied) {
 			await applyAddMissingImports(editor.document);
 		}
 	} catch (error) {
