@@ -26,6 +26,18 @@ class BoilerplateEdit(BaseModel):
     )
 
 
+class BoilerplateEdits(BaseModel):
+    """All search/replace edits needed to carry out one instruction."""
+
+    edits: list[BoilerplateEdit] = Field(
+        description=(
+            "One edit per distinct region the instruction touches. If a change affects "
+            "code elsewhere in the file (callers, related declarations, template "
+            "bindings), include an edit for each so the file stays consistent."
+        )
+    )
+
+
 class IndexDocumentRequest(BaseModel):
     content: str
     source: str

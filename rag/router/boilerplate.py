@@ -7,5 +7,7 @@ router = APIRouter(prefix="/boilerplate", tags=["Boilerplate"])
 
 @router.post("/generate-boilerplate", tags=["Boilerplate"])
 async def generate_boilerplate(request: GenerateBoilerplateRequest):
-    edit = await run_generate_boilerplate(request)
-    return JSONResponse(content={"search": edit.search, "replace": edit.replace})
+    result = await run_generate_boilerplate(request)
+    return JSONResponse(
+        content={"edits": [{"search": e.search, "replace": e.replace} for e in result.edits]}
+    )
