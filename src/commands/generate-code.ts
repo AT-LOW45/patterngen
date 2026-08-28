@@ -4,6 +4,7 @@ import codeActions from "../constants/code-actions";
 import { applyCodeEdits, CodeEdit } from "../service/edit.service";
 import * as vscode from "vscode";
 
+/** Ask the language server for the code actions available in `range`, optionally filtered to a `kind`. */
 async function requestCodeActions(
 	document: vscode.TextDocument,
 	range: vscode.Range,
@@ -22,10 +23,12 @@ async function requestCodeActions(
 	);
 }
 
-// The generated code deliberately omits imports, so ask the language server to add
-// them. TS/JS expose a dedicated `source.addMissingImports` action; Vue/Volar only
-// surface a titled action, so we fall back to that. The server needs a beat to
-// analyse the freshly inserted code, hence the short retry loop.
+/**
+ * The generated code deliberately omits imports, so ask the language server to add
+ * them. TS/JS expose a dedicated `source.addMissingImports` action; Vue/Volar only
+ * surface a titled action, so we fall back to that. The server needs a beat to
+ * analyse the freshly inserted code, hence the short retry loop.
+ */
 async function applyAddMissingImports(document: vscode.TextDocument): Promise<boolean> {
 	const isImportAction = (a: vscode.CodeAction) =>
 		a.kind?.value === codeActions.addMissingImports ||

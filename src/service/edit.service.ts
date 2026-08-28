@@ -12,11 +12,13 @@ export interface ApplyEditsResult {
 
 type Match = { start: number; end: number };
 
-// Find every place an edit's `search` occurs in the file, in order. Tries exact
-// matches first; if there are none, falls back to a tolerant match — runs of
-// whitespace become flexible and semicolons are optional — so the model reformatting
-// indentation/spacing or a trailing semicolon doesn't cause a miss. Returning ALL
-// occurrences lets the caller give each edit a distinct one (duplicate anchors).
+/**
+ * Find every place an edit's `search` occurs in the file, in order. Tries exact
+ * matches first; if there are none, falls back to a tolerant match — runs of
+ * whitespace become flexible and semicolons are optional — so the model reformatting
+ * indentation/spacing or a trailing semicolon doesn't cause a miss. Returning ALL
+ * occurrences lets the caller give each edit a distinct one (duplicate anchors).
+ */
 function findMatches(text: string, search: string): Match[] {
 	const matches: Match[] = [];
 	if (search.length === 0) {
@@ -57,14 +59,16 @@ function findMatches(text: string, search: string): Match[] {
 
 const overlaps = (a: Match, b: Match) => a.start < b.end && b.start < a.end;
 
-// Apply a set of search/replace edits to the editor's document. Every `search`
-// anchor is located against the ORIGINAL document text and all edits are applied
-// together in a single edit() call, so earlier replacements don't shift the offsets
-// of later ones. An edit with an empty `search` is inserted at the selection/cursor
-// (new code with no anchor). Returns how many edits were applied vs. not located.
-//
-// Kept independent of any one command so the input-box flow and a future chat/coding
-// session can share the same edit-application engine.
+/**
+ * Apply a set of search/replace edits to the editor's document. Every `search`
+ * anchor is located against the ORIGINAL document text and all edits are applied
+ * together in a single edit() call, so earlier replacements don't shift the offsets
+ * of later ones. An edit with an empty `search` is inserted at the selection/cursor
+ * (new code with no anchor). Returns how many edits were applied vs. not located.
+ *
+ * Kept independent of any one command so the input-box flow and a future chat/coding
+ * session can share the same edit-application engine.
+ */
 export async function applyCodeEdits(
 	editor: vscode.TextEditor,
 	selection: vscode.Selection,
