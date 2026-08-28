@@ -1,7 +1,7 @@
 // src/commands/generate-code.ts
 import boilerplateService from "../service/boilerplate.service";
 import codeActions from "../constants/code-actions";
-import { applyBoilerplateEdits, BoilerplateEdit } from "../service/edit.service";
+import { applyCodeEdits, CodeEdit } from "../service/edit.service";
 import * as vscode from "vscode";
 
 async function requestCodeActions(
@@ -124,12 +124,12 @@ export default async function generateCode(context: vscode.ExtensionContext) {
 					selectedText,
 					fileContent,
 				);
-				return response.data.edits as BoilerplateEdit[];
+				return response.data.edits as CodeEdit[];
 			},
 		);
 
 		// apply every edit, each located by its `search` anchor against the original file
-		const { applied, missed } = await applyBoilerplateEdits(editor, selection, edits);
+		const { applied, missed } = await applyCodeEdits(editor, selection, edits);
 
 		if (missed > 0) {
 			vscode.window.showWarningMessage(
