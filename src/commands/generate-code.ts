@@ -118,7 +118,7 @@ export default async function generateCode(context: vscode.ExtensionContext) {
 				const language = editor.document.languageId;
 				const selectedText = editor.document.getText(selection);
 				const fileContent = editor.document.getText();
-				const response = await boilerplateService.generateBoilerplate(
+				const response = await boilerplateService.generateCode(
 					input,
 					language,
 					selectedText,
