@@ -2,8 +2,6 @@ import * as dotenv from "dotenv";
 import * as vscode from "vscode";
 import generateCode from "./commands/generate-code";
 import openKnowledgeBase from "./commands/open-knowledge-base";
-import symbolSpike from "./commands/symbol-spike";
-import wrapInTryCatch from "./commands/wrap-in-try-catch";
 import COMMANDS from "./constants/commands";
 import { startLivelinessCheck, withBackendReady } from "./service/system.service";
 
@@ -15,7 +13,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	console.log("welcome to patterngen!");
 
 	context.subscriptions.push(
-		registerCommand(COMMANDS.tryCatch.id, () => wrapInTryCatch(context)),
 		registerCommand(
 			COMMANDS.generateCode.id,
 			withBackendReady(() => generateCode(context)),
@@ -24,7 +21,6 @@ export async function activate(context: vscode.ExtensionContext) {
 			COMMANDS.openKnowledgeBase.id,
 			withBackendReady(() => openKnowledgeBase()),
 		),
-		registerCommand(COMMANDS.symbolSpike.id, () => symbolSpike(context)),
 	);
 
 	// commands are already registered; run the check in the background so it can

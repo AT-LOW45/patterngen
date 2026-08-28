@@ -27,20 +27,12 @@
 		},
 		"commands": [
 			{
-				"command": "patterngen.tryCatch",
-				"title": "Wrap Selection in try/catch"
-			},
-			{
 				"command": "patterngen.generateCode",
 				"title": "Generate Code"
 			},
 			{
 				"command": "patterngen.openKnowledgeBase",
 				"title": "Open Knowledge Base"
-			},
-			{
-				"command": "patterngen.symbolSpike",
-				"title": "Patterngen: Symbol Spike (debug)"
 			}
 		]
 	},
