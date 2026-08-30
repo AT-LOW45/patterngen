@@ -4,10 +4,13 @@ layout: home
 
 hero:
   name: "Patterngen"
-  text: "Boilerplate grounded in your ADRs"
-  tagline: A VS Code extension that generates code following your team's documented conventions — not generic snippets.
+  text: "Code grounded in your ADRs"
+  tagline: A VS Code extension that generates and edits code to match your team's documented conventions — not generic snippets.
   actions:
     - theme: brand
+      text: Get Started
+      link: /getting-started
+    - theme: alt
       text: View on GitHub
       link: https://github.com/AT-LOW45/patterngen
 
