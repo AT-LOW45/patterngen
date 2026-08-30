@@ -58,3 +58,19 @@ jobs:
           python-version: "3.13"
       - run: uv sync --frozen
       - run: uv run --with pyright pyright
+
+  docs:
+    name: Docs (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - run: npm ci
+      - run: npm run docs:build
