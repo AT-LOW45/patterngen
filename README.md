@@ -1,42 +1,55 @@
 # Patterngen
 
-**RAG-based code generation that enforces your team's architectural decisions.**
+**RAG-based code generation and editing that enforces your team's architectural decisions.**
 
-Patterngen is a VS Code extension that generates boilerplate grounded in your own **Architecture Decision Records (ADRs)**. Instead of producing generic code, it retrieves the ADRs relevant to what you're building and instructs the LLM to follow them — so generated code matches your team's conventions for error handling, data fetching, response shapes, and whatever else you've documented.
+Patterngen is a VS Code extension that generates and edits code grounded in your own **Architecture Decision Records (ADRs)**. Instead of producing generic code, it retrieves the ADRs relevant to what you're building and instructs the LLM to follow them — so the code matches your team's conventions for error handling, data fetching, response shapes, and whatever else you've documented.
+
+Given a natural-language instruction, Patterngen reads the file you're working in, works out *what* to change and *where*, and applies precise edits in place — following your ADRs and resolving imports for you.
 
 ## How it works
 
 ```
-VS Code (generate boilerplate)
-        │  prompt + language + selected code
+VS Code (Generate Code)
+        │  instruction + language + whole file (+ optional selection)
         ▼
 FastAPI backend  ──►  retrieve relevant ADRs (ChromaDB vector search)
         │                     │
         │  ◄──────────────────┘  full ADRs, in document order
         ▼
-      LLM  ──►  code that follows the retrieved ADRs
+      LLM  ──►  targeted search/replace edits that follow the ADRs
         │
         ▼
-   inserted at your cursor
+VS Code applies the edits in place ──► editor auto-adds the imports
 ```
 
-The key idea is in retrieval: rather than returning scattered chunks, Patterngen identifies which **whole ADRs** are relevant to your request and feeds them to the LLM in full — so the concrete code examples in an ADR are never dropped. Irrelevant requests retrieve nothing, so the model just generates normally instead of being misled.
+Two ideas make this work:
+
+- **Whole-ADR retrieval.** Rather than returning scattered chunks, Patterngen identifies which *whole ADRs* are relevant to your request and feeds them to the LLM in full — so the concrete code examples in an ADR are never dropped. Irrelevant requests retrieve nothing, so the model just generates normally instead of being misled.
+- **File-aware edits.** The model doesn't emit a blob to paste at your cursor. It returns a set of `{search, replace}` edits; the extension locates each `search` in your file — tolerant of whitespace and trivial formatting differences — and applies the replacement in place. So a single instruction can span multiple regions (a function *and* its callers), and a rename updates every occurrence. Imports are deliberately left out of the model's output and resolved afterward by the editor's language server, so they always point at the correct paths.
 
 ## Project structure
 
 | Path | Stack | Role |
 |------|-------|------|
-| `rag/` | Python · FastAPI · LangChain · ChromaDB | Backend: indexes ADRs, retrieves context, generates code |
-| `ui/` | Vue 3 · Vite · PrimeVue · TypeScript | Knowledge-base manager: upload, edit, delete ADRs |
 | `src/` | TypeScript · VS Code API | The extension itself |
+| `rag/` | Python · FastAPI · LangChain · ChromaDB | Backend: indexes ADRs, retrieves context, generates edits |
+| `ui/` | Vue 3 · Vite · PrimeVue · TypeScript | Knowledge-base manager: upload, edit, delete ADRs |
+| `docs-site/` | VitePress | Documentation site (deployed to GitHub Pages) |
+| `docs/adr/` | Markdown | Sample ADRs used to seed the knowledge base |
 
 The Vue app is built to `ui/dist` and served by FastAPI at `/`, so the backend and knowledge-base UI run as a single server.
+
+## Documentation
+
+The documentation site is built with VitePress from `docs-site/` and deployed to **GitHub Pages** on every change (see [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)):
+
+**https://at-low45.github.io/patterngen/**
 
 ## Prerequisites
 
 - **Python ≥ 3.13** and [`uv`](https://docs.astral.sh/uv/)
-- **Node.js** (for the Vue knowledge-base UI)
-- An **LLM API key** — Groq is the current default; the provider is configurable (see [llm_config.py](rag/config/llm_config.py))
+- **Node.js** (for the Vue knowledge-base UI, and the docs site)
+- An **LLM API key** — Groq is the current default (`openai/gpt-oss-120b`); the model and provider are configurable (see [llm_config.py](rag/config/llm_config.py))
 - An **S3-compatible blob store** (for persisting raw ADR content) — for local development, use the bundled [MinIO](https://min.io/) setup, which only requires **Docker** (see step 2)
 
 ## Setup
@@ -47,6 +60,7 @@ Create a `.env` at the repo root (the `GROQ_API_KEY` below reflects the current 
 
 ```env
 GROQ_API_KEY=your_groq_key
+# GROQ_MODEL=openai/gpt-oss-120b   # optional — override the default model
 API_ENDPOINT=http://localhost:8000
 BLOB_ENDPOINT=http://localhost:9000
 BLOB_ACCESS_KEY=...
@@ -103,8 +117,10 @@ Open the repo in VS Code and press **F5** to launch an Extension Development Hos
 
 | Command | What it does |
 |---------|--------------|
-| **Patterngen: Generate Boilerplate** | Prompts for what to generate, detects the active file's language, optionally uses your selected code as context, and inserts ADR-grounded code at the cursor. |
+| **Patterngen: Generate Code** | Prompts for an instruction, sends the active file and its language to the backend, and applies the returned ADR-grounded edits **in place** — resolving imports automatically. If you have code selected, that selection is used as the focus for the change. |
 | **Patterngen: Open Knowledge Base** | Opens the knowledge-base UI (the `ragEndpoint`) in your browser to manage ADRs. |
+
+On activation the extension checks that the backend is reachable and warns if it isn't, so backend-dependent commands fail gracefully rather than silently.
 
 ### Managing ADRs
 
@@ -114,7 +130,7 @@ Use the knowledge base UI to upload markdown ADRs, edit them in-place, and delet
 
 This extension contributes the following setting:
 
-- `patterngen.ragEndpoint` — URL of the RAG backend. Default: `http://localhost:8000`.
+- `patterngen.ragEndpoint` — URL of the RAG backend. Default: `http://127.0.0.1:8000`.
 
 ## Retrieval details
 
@@ -122,15 +138,18 @@ This extension contributes the following setting:
 - **Vector store:** ChromaDB (persisted to `rag/chroma_db`)
 - **Chunking:** `MarkdownHeaderTextSplitter` on `#`/`##`/`###`, headers preserved, one chunk per section
 - **Dedup:** LangChain incremental indexing with a SQLite record manager
-- **LLM:** Groq `llama-3.3-70b-versatile` by default — configurable in [llm_config.py](rag/config/llm_config.py)
-- **Retrieval:** ranks whole ADRs by their best-matching chunk, keeps those above a relevance threshold (capped), and returns each in full reassembled in document order
+- **LLM:** Groq `openai/gpt-oss-120b` by default — set `GROQ_MODEL` to override, or swap the provider in [llm_config.py](rag/config/llm_config.py)
+- **Retrieval:** ranks whole ADRs by their best-matching chunk, keeps those above a relevance threshold (capped), and returns each in full, reassembled in document order
 
 ## Known limitations
 
 - The relevance threshold (`0.5`) is calibrated against a small knowledge base; revisit it as you add more ADRs, since a stronger embedding model compresses scores into a narrower band.
 - Retrieval still depends somewhat on phrasing. If quality degrades as the knowledge base grows, query enrichment (e.g. HyDE) or a hosted embedding model are the next levers.
+- File-aware edits rely on the model copying existing code accurately. Matching is tolerant of whitespace and trivial formatting differences, but a heavily paraphrased `search` block may not be located — when that happens the extension warns rather than editing the wrong place.
 
-## Development
+## Contributing & development
 
+- **Contributing guide:** [CONTRIBUTING.md](CONTRIBUTING.md) — branching model, branch naming, and PR conventions.
+- **CI:** GitHub Actions runs compile/lint (extension), build (UI), Pyright (backend), and the docs build on every pull request, plus CodeQL/Dependabot/secret scanning. `main` is protected — changes land via pull request.
 - **Roadmap & tasks:** [GitHub Issues](https://github.com/AT-LOW45/patterngen/issues)
 - [CHANGELOG.md](CHANGELOG.md) — user-facing release notes
