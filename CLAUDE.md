@@ -8,6 +8,12 @@ Patterngen is a VS Code extension that generates boilerplate grounded in a team'
 
 Read `README.md` for the product-level overview and retrieval design; this file covers the operational/architectural details needed to work in the code.
 
+## Git & pull requests — ASK FIRST
+
+**Never `git commit`, `git push`, open a pull request, or merge a pull request without the user's explicit confirmation — every time, for each action.** Editing files in the working tree and creating local branches are fine without asking; anything that writes to git history or the remote is gated. Prepare the change, then **stop and ask**.
+
+Branching model is GitHub Flow — `main` is protected and changes land via PR (see [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and conventions).
+
 ## Three components, one repo
 
 | Path   | Stack                                          | Role                                                            |
