@@ -4,7 +4,7 @@
 		modal
 		dismissable-mask
 		:draggable="false"
-		style="z-index: 100000 !important;"
+		style="z-index: 100000 !important"
 		:style="{ width: '540px' }"
 	>
 		<template #header>
@@ -48,16 +48,25 @@
 			<li
 				v-for="(finding, i) in findings"
 				:key="i"
-				class="flex gap-3 rounded-xl border border-l-4 border-slate-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-800/40"
-				:class="config(finding.severity).spine"
+				class="flex items-start gap-3 rounded-xl border border-l-4 border-slate-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-800/40"
+				:class="[
+					config(finding.severity).spine,
+					finding.navigable ? 'cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-surface-800' : '',
+				]"
+				@click="finding.navigable && onNavigate(finding)"
 			>
 				<Icon :icon="config(finding.severity).icon" class="mt-0.5 shrink-0 text-lg" :class="config(finding.severity).fg" />
-				<div class="flex min-w-0 flex-col gap-1">
+				<div class="flex min-w-0 flex-1 flex-col gap-1">
 					<span class="text-xs font-semibold uppercase tracking-wide" :class="config(finding.severity).fg">
 						{{ config(finding.severity).label }} · {{ finding.section }}
 					</span>
 					<p class="text-base leading-relaxed text-slate-700 dark:text-surface-200">{{ finding.message }}</p>
 				</div>
+				<Icon
+					v-if="finding.navigable"
+					icon="mdi:arrow-right"
+					class="shrink-0 self-center text-lg text-slate-400 dark:text-surface-400"
+				/>
 			</li>
 		</ul>
 
@@ -76,12 +85,20 @@
 import type { ReviewFinding } from "@/api-service";
 import { Button, Dialog } from "primevue";
 import { computed } from "vue";
-import { Icon } from '@iconify/vue';
+import { Icon } from "@iconify/vue";
 
-const props = defineProps<{ findings: ReviewFinding[]; loading?: boolean; error?: boolean }>();
+// `navigable` is added by the create page for findings whose section maps to a form
+// field; the edit page passes plain findings (undefined → not clickable).
+type DisplayFinding = ReviewFinding & { navigable?: boolean };
+
+const props = defineProps<{ findings: DisplayFinding[]; loading?: boolean; error?: boolean }>();
 const visible = defineModel<boolean>("visible");
 
-const emit = defineEmits<{ (e: "submit-anyway"): void }>();
+const emit = defineEmits<{ (e: "submit-anyway"): void; (e: "navigate", finding: DisplayFinding): void }>();
+
+const onNavigate = (finding: DisplayFinding): void => {
+	emit("navigate", finding);
+};
 
 const SEVERITY = {
 	error: {

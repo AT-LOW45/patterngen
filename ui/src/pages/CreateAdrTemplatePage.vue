@@ -37,11 +37,11 @@
 					</FormField>
 
 					<div class="grid grid-cols-2 gap-3">
-						<FormField label="Status" required :error-message="validationErrors?.properties?.status?.errors">
+						<FormField id="adr-field-status" label="Status" required :error-message="validationErrors?.properties?.status?.errors">
 							<Select v-model="form.status" :options="statusOptions" placeholder="Select status" fluid />
 						</FormField>
 						<FormField
-							label="Scope"
+							id="adr-field-scope" label="Scope"
 							required
 							:tip="{ message: 'The system or component boundary this applies to.' }"
 							:error-message="validationErrors?.properties?.scope?.errors"
@@ -50,7 +50,7 @@
 						</FormField>
 					</div>
 
-					<FormField label="Context">
+					<FormField id="adr-field-context" label="Context">
 						<Textarea
 							v-model="form.context"
 							placeholder="Describe the situation and why a decision was needed..."
@@ -69,7 +69,7 @@
 					</h2>
 
 					<FormField
-						label="Decision"
+						id="adr-field-decision" label="Decision"
 						required
 						:tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }"
 						:error-message="validationErrors?.properties?.decision?.errors"
@@ -125,7 +125,7 @@
 					</h2>
 
 					<FormField
-						label="Implementation"
+						id="adr-field-implementation" label="Implementation"
 						:tip="{ message: 'Code examples, exception classes, response shapes. Use the </> button for fenced code blocks.' }"
 					>
 						<MdEditor
@@ -151,6 +151,7 @@
 					<div
 						v-for="(section, i) in form.customSections"
 						:key="i"
+						:id="'adr-field-custom-' + i"
 						class="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-surface-700 p-4 bg-white"
 					>
 						<div class="flex items-center gap-2">
@@ -197,7 +198,7 @@
 						Consequences
 					</h2>
 
-					<FormField label="Positive consequences">
+					<FormField id="adr-field-consequences" label="Positive consequences">
 						<Textarea
 							v-model="form.positiveConsequences"
 							placeholder="What improves as a result of this decision?"
@@ -217,7 +218,7 @@
 						/>
 					</FormField>
 
-					<FormField label="Notes" :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }">
+					<FormField id="adr-field-notes" label="Notes" :tip="{ message: 'Supports code blocks — use the </> button for fenced code.' }">
 						<MdEditor
 							v-model="form.notes"
 							:theme="isDark ? 'dark' : 'light'"
@@ -281,14 +282,17 @@
 
 	<ReviewFindingsDialog
 		v-model:visible="showReviewDialog"
-		:findings="reviewFindings"
+		:findings="navigableFindings"
 		:loading="checking"
 		:error="hasReviewError"
 		@submit-anyway="submitAnyway"
+			@navigate="onNavigateToFinding"
 	/>
 </template>
 
 <script setup lang="ts">
+import { ReviewFinding } from "@/api-service";
+import { computed } from "vue";
 import ReviewFindingsDialog from "@/components/dialog/ReviewFindingsDialog.vue";
 import FormField from "@/components/form/FormField.vue";
 import { useCreateAdr } from "@/composables/useCreateAdr";
@@ -325,4 +329,56 @@ const {
 	hasReviewError,
 	submitAnyway,
 } = useCreateAdr();
+
+// Map a review finding's section to the form field it came from, so a finding in the
+// dialog can jump to (and highlight) the offending field. Fixed sections map 1:1;
+// custom sections match by heading. Document-level findings (word count, unclosed
+// fence) have no single field, so they aren't navigable.
+const FIXED_SECTION_IDS: Record<string, string> = {
+	Status: "adr-field-status",
+	Scope: "adr-field-scope",
+	Context: "adr-field-context",
+	Decision: "adr-field-decision",
+	Implementation: "adr-field-implementation",
+	Consequences: "adr-field-consequences",
+	Notes: "adr-field-notes",
+};
+
+const sectionAnchorId = (section: string): string | null => {
+	if (FIXED_SECTION_IDS[section]) return FIXED_SECTION_IDS[section];
+	const idx = form.value.customSections.findIndex((s) => s.heading.trim() === section);
+	return idx !== -1 ? `adr-field-custom-${idx}` : null;
+};
+
+// Decorate findings with `navigable` so the dialog makes the mappable ones clickable.
+const navigableFindings = computed(() =>
+	reviewFindings.value.map((f) => ({ ...f, navigable: sectionAnchorId(f.section) !== null })),
+);
+
+const onNavigateToFinding = (finding: ReviewFinding): void => {
+	const id = sectionAnchorId(finding.section);
+	if (!id) return;
+	const el = document.getElementById(id);
+	if (!el) return;
+	showReviewDialog.value = false;
+	el.scrollIntoView({ behavior: "smooth", block: "center" });
+	el.querySelector<HTMLElement>('input, textarea, [contenteditable="true"], .cm-editor')?.focus();
+	el.classList.add("finding-highlight");
+	window.setTimeout(() => el.classList.remove("finding-highlight"), 1600);
+};
 </script>
+
+<style>
+.finding-highlight {
+	animation: finding-pulse 1.6s ease-out;
+	border-radius: 0.5rem;
+}
+@keyframes finding-pulse {
+	0% {
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.55);
+	}
+	100% {
+		box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+	}
+}
+</style>
