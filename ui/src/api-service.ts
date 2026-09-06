@@ -61,5 +61,6 @@ export const draftService = {
 export type ReviewFinding = { severity: "warning" | "error"; section: string; message: string };
 
 export const reviewService = {
-	reviewDocument: (content: string) => api.post<{ findings: ReviewFinding[] }>("/knowledge-base/adr-review", { content }),
+	reviewDocument: (content: string) =>
+		api.post<{ findings: ReviewFinding[]; llm_ok: boolean }>("/knowledge-base/adr-review", { content }),
 };

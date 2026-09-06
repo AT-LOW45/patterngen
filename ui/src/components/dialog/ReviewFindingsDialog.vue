@@ -19,6 +19,17 @@
 			</div>
 		</template>
 
+		<!-- Semantic (LLM) review couldn't run — the deterministic checks still did. -->
+		<div
+			v-if="degraded && !loading && !error"
+			class="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40"
+		>
+			<Icon icon="mdi:alert" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+			<span class="text-amber-800 dark:text-amber-200">
+				Automated semantic review couldn't run — showing structural checks only.
+			</span>
+		</div>
+
 		<!-- Loading state -->
 		<div v-if="loading" class="flex flex-col items-center gap-3 py-12 text-center">
 			<Icon icon="mdi:loading" class="animate-spin text-4xl text-slate-400 dark:text-surface-400" />
@@ -91,7 +102,7 @@ import { Icon } from "@iconify/vue";
 // field; the edit page passes plain findings (undefined → not clickable).
 type DisplayFinding = ReviewFinding & { navigable?: boolean };
 
-const props = defineProps<{ findings: DisplayFinding[]; loading?: boolean; error?: boolean }>();
+const props = defineProps<{ findings: DisplayFinding[]; loading?: boolean; error?: boolean; degraded?: boolean }>();
 const visible = defineModel<boolean>("visible");
 
 const emit = defineEmits<{ (e: "submit-anyway"): void; (e: "navigate", finding: DisplayFinding): void }>();

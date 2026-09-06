@@ -138,6 +138,8 @@ export function useCreateAdr() {
 	const reviewFindings = ref<ReviewFinding[]>([]);
 	const showReviewDialog = ref(false);
 	const hasReviewError = ref(false);
+	// The semantic (LLM) pass errored server-side (distinct from the whole call failing).
+	const reviewDegraded = ref(false);
 
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
@@ -357,10 +359,12 @@ export function useCreateAdr() {
 	const checkQuality = async () => {
 		reviewFindings.value = [];
 		hasReviewError.value = false;
+		reviewDegraded.value = false;
 		checking.value = true;
 		try {
 			const result = await reviewService.reviewDocument(markdown.value);
 			reviewFindings.value = result.data.findings;
+			reviewDegraded.value = result.data.llm_ok === false;
 			showReviewDialog.value = true;
 		} catch (error) {
 			console.error(error);
@@ -378,7 +382,7 @@ export function useCreateAdr() {
 		submitting.value = true;
 		try {
 			await checkQuality();
-			if (hasReviewError.value || reviewFindings.value.length > 0) {
+			if (hasReviewError.value || reviewFindings.value.length > 0 || reviewDegraded.value) {
 				return;
 			}
 
@@ -467,6 +471,7 @@ export function useCreateAdr() {
 		reviewFindings,
 		showReviewDialog,
 		hasReviewError,
+		reviewDegraded,
 		checkQuality,
 		submitAnyway,
 	};

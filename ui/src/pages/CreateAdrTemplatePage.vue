@@ -285,6 +285,7 @@
 		:findings="navigableFindings"
 		:loading="checking"
 		:error="hasReviewError"
+		:degraded="reviewDegraded"
 		@submit-anyway="submitAnyway"
 			@navigate="onNavigateToFinding"
 	/>
@@ -324,6 +325,7 @@ const {
 	discardAndLeave,
 	saveDraftAndLeave,
 	reviewFindings,
+	reviewDegraded,
 	showReviewDialog,
 	checking,
 	hasReviewError,

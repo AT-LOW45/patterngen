@@ -1,7 +1,11 @@
 import re
 from typing import List
 from config.llm_config import groq_llm
-from schema.knowledgebase_schema import ReviewResultSchema, ReviewOutputSchema
+from schema.knowledgebase_schema import (
+    ReviewResultSchema,
+    ReviewOutputSchema,
+    ReviewResponseSchema,
+)
 from langchain_core.prompts import ChatPromptTemplate
 
 
@@ -84,7 +88,9 @@ For each problem, set an appropriate severity, name the section it belongs to (e
 short specific message. If the ADR is sound, return an empty findings list."""
 
 
-async def run_llm_review(content: str) -> list[ReviewResultSchema]:
+async def run_llm_review(content: str) -> tuple[list[ReviewResultSchema], bool]:
+    """Returns (findings, ok). `ok` is False when the LLM call errored, so the caller
+    can tell 'review errored' apart from 'no issues found' — both otherwise look like []."""
     template = ChatPromptTemplate.from_messages(
         [
             ("system", REVIEW_SYSTEM_PROMPT),
@@ -99,11 +105,13 @@ async def run_llm_review(content: str) -> list[ReviewResultSchema]:
     try:
         response = await chain.ainvoke({"content": content})
     except Exception as error:
-        # Advisory feature — never fail the caller because the LLM hiccuped.
+        # Advisory feature — never fail the caller because the LLM hiccuped, but report
+        # ok=False so a silent failure isn't mistaken for a clean review.
         print(f"LLM review failed: {error}")
-        return []
+        return [], False
 
-    return response.findings if isinstance(response, ReviewOutputSchema) else []
+    findings = response.findings if isinstance(response, ReviewOutputSchema) else []
+    return findings, True
 
 
 def run_deterministic_checks(content: str) -> list[ReviewResultSchema]:
@@ -152,17 +160,18 @@ def run_deterministic_checks(content: str) -> list[ReviewResultSchema]:
 
 async def review_adr(
     content: str, check_types: list[str] = ["deterministic", "llm"]
-) -> ReviewOutputSchema:
+) -> ReviewResponseSchema:
     """
     orchestrator function to run ADR checks, run both deterministic and llm checks by default
     """
     results: list[ReviewResultSchema] = []
+    llm_ok = True
 
     if "deterministic" in check_types:
         results = run_deterministic_checks(content)
 
     if "llm" in check_types:
-        llm_review_results = await run_llm_review(content)
-        results = results + llm_review_results
+        llm_findings, llm_ok = await run_llm_review(content)
+        results = results + llm_findings
 
-    return ReviewOutputSchema(findings=results)
+    return ReviewResponseSchema(findings=results, llm_ok=llm_ok)

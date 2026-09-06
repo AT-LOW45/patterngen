@@ -51,6 +51,7 @@
 		:findings="reviewFindings"
 		:loading="checking"
 		:error="hasReviewError"
+		:degraded="reviewDegraded"
 		@submit-anyway="onSubmitAnyway"
 	/>
 </template>
@@ -80,6 +81,8 @@ const checking = ref(false);
 const reviewDialogOpen = ref(false);
 const reviewFindings = ref<ReviewFinding[]>([]);
 const hasReviewError = ref(false);
+// The semantic (LLM) pass errored server-side, distinct from the whole call failing.
+const reviewDegraded = ref(false);
 
 const recordOptions = computed(() =>
 	records.value.map((record) => ({
@@ -166,16 +169,19 @@ const onDownload = () => {
 const hasAdrErrors = async () => {
 	reviewFindings.value = [];
 	hasReviewError.value = false;
+	reviewDegraded.value = false;
 	checking.value = true;
 	try {
 		reviewDialogOpen.value = true;
 		const result = await reviewService.reviewDocument(editorText.value);
 		const findings = result.data.findings;
+		reviewDegraded.value = result.data.llm_ok === false;
 		if (findings.length > 0) {
 			reviewFindings.value = findings;
 			return true;
 		}
-		return false;
+		// Degraded with no findings still halts the save so the user sees the banner.
+		return reviewDegraded.value;
 	} catch (error) {
 		hasReviewError.value = true;
 		return true;

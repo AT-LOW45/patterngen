@@ -20,3 +20,16 @@ class ReviewOutputSchema(BaseModel):
     findings: list[ReviewResultSchema] = Field(
         description="All issues found. Empty list if the ADR is sound."
     )
+
+
+class ReviewResponseSchema(BaseModel):
+    """API response: the findings plus whether the semantic (LLM) pass actually ran.
+
+    Separate from ReviewOutputSchema (which the LLM fills) so `llm_ok` isn't something
+    the model is asked to produce."""
+
+    findings: list[ReviewResultSchema]
+    llm_ok: bool = Field(
+        default=True,
+        description="False when the semantic (LLM) pass errored — findings are structural-only.",
+    )
