@@ -172,7 +172,9 @@ export function useCreateAdr() {
 		lines.push(f.id ? `# ${f.id}: ${title}` : `# ${title}`, "");
 		lines.push("## Status", f.status || "_Not set_", "");
 		lines.push("## Scope", f.scope || "_Not set_", "");
-		lines.push("## Context", f.context || "_Describe the situation and why a decision was needed._", "");
+		if (f.context.trim()) {
+			lines.push("## Context", f.context.trim(), "");
+		}
 		lines.push("## Decision", f.decision || "_State the decision clearly._");
 
 		if (f.alternatives.length) {
@@ -191,15 +193,14 @@ export function useCreateAdr() {
 			lines.push("", `## ${s.heading.trim() || "Untitled Section"}`, s.body.trim());
 		}
 
-		lines.push("", "## Consequences");
-		if (f.positiveConsequences.trim()) {
-			lines.push("", "### Positive", f.positiveConsequences.trim());
-		}
-		if (f.negativeConsequences.trim()) {
-			lines.push("", "### Trade-offs", f.negativeConsequences.trim());
-		}
-		if (!f.positiveConsequences.trim() && !f.negativeConsequences.trim()) {
-			lines.push("_What improves, and what gets harder as a result._");
+		if (f.positiveConsequences.trim() || f.negativeConsequences.trim()) {
+			lines.push("", "## Consequences");
+			if (f.positiveConsequences.trim()) {
+				lines.push("", "### Positive", f.positiveConsequences.trim());
+			}
+			if (f.negativeConsequences.trim()) {
+				lines.push("", "### Trade-offs", f.negativeConsequences.trim());
+			}
 		}
 		if (f.notes.trim()) {
 			lines.push("", "## Notes", f.notes.trim());
