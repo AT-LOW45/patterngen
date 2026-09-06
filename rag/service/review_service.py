@@ -1,21 +1,28 @@
 import re
 from typing import List
 from config.llm_config import groq_llm
+from config.review_config import DEFAULT_SECTIONS, MAX_WORDS
 from schema.knowledgebase_schema import (
     ReviewResultSchema,
     ReviewOutputSchema,
     ReviewResponseSchema,
+    SectionSpec,
 )
 from langchain_core.prompts import ChatPromptTemplate
 
 
-def missing_sections(
-    content: str, required=["Status", "Scope", "Decision"]
-) -> List[str]:
+def required_titles(sections: list[SectionSpec]) -> list[str]:
+    """Titles of the sections that must be present for the document to pass structural checks."""
+    return [s["title"] for s in sections if s["required"]]
+
+
+def missing_sections(content: str, required: list[str] | None = None) -> List[str]:
     """
     Returns a list of required H2 section names that are missing from content.
     Empty list means all required sections are present.
     """
+    if required is None:
+        required = required_titles(DEFAULT_SECTIONS)
     # Find all H2 headings, e.g. "## Status" (allowing trailing whitespace, case-insensitive)
     found = {
         match.group(1).strip().lower()
@@ -32,9 +39,6 @@ def unclosed_code_fence(content: str) -> bool:
     # Match lines that are code fence markers (``` or more backticks, optionally indented)
     fences = re.findall(r"^[ \t]*`{3,}", content, re.MULTILINE)
     return len(fences) % 2 == 1
-
-
-MAX_WORDS = 1500
 
 
 def word_count(content: str) -> int:
@@ -55,17 +59,21 @@ def section_bodies(content: str) -> list[tuple[str, str]]:
     return sections
 
 
-REVIEW_SYSTEM_PROMPT = """You are an ADR (Architecture Decision Record) reviewer. The ADR (markdown) will be \
+def build_review_prompt(sections: list[SectionSpec]) -> str:
+    """Assemble the system prompt from the section catalog. The per-section purpose bullets
+    are generated from `sections` so the semantic pass stays specific (that specificity is
+    what catches gibberish) while following whatever format the caller supplies.
+
+    NB: the returned string must contain no literal braces — ChatPromptTemplate parses `{}`
+    as input variables. The catalog text has none, so `.join` here is safe."""
+    section_lines = "\n".join(f"  * {s['title']}: {s['purpose']}" for s in sections)
+    return f"""You are an ADR (Architecture Decision Record) reviewer. The ADR (markdown) will be \
 used to ground LLM code generation, so flag anything that makes it useless or misleading for that.
 
 Flag these:
 - NON-SUBSTANTIVE content — a section whose text is gibberish (e.g. "rgrtg", "asdf"), filler, or otherwise \
 fails to fulfil the section's purpose. Judge each section by what it is FOR:
-  * Status: one of Proposed / Accepted / Deprecated / Superseded.
-  * Scope: names a real system or component boundary.
-  * Context: describes the actual situation or problem that motivated the decision.
-  * Decision: states a concrete decision — what was chosen (ideally why).
-  * Consequences: describes real outcomes or trade-offs.
+{section_lines}
   A section that doesn't do its job — e.g. a Decision of "decision" or "this is bad yo", a Context of "humus", \
 a Scope of "rgrtg" — is NOT substantive; flag it with severity "warning".
 - INTERNAL CONTRADICTIONS — one part conflicting with another. In particular, check that any code labelled \
@@ -88,12 +96,14 @@ For each problem, set an appropriate severity, name the section it belongs to (e
 short specific message. If the ADR is sound, return an empty findings list."""
 
 
-async def run_llm_review(content: str) -> tuple[list[ReviewResultSchema], bool]:
+async def run_llm_review(
+    content: str, sections: list[SectionSpec] = DEFAULT_SECTIONS
+) -> tuple[list[ReviewResultSchema], bool]:
     """Returns (findings, ok). `ok` is False when the LLM call errored, so the caller
     can tell 'review errored' apart from 'no issues found' — both otherwise look like []."""
     template = ChatPromptTemplate.from_messages(
         [
-            ("system", REVIEW_SYSTEM_PROMPT),
+            ("system", build_review_prompt(sections)),
             ("human", "Review this ADR:\n\n{content}"),
         ]
     )
@@ -114,10 +124,13 @@ async def run_llm_review(content: str) -> tuple[list[ReviewResultSchema], bool]:
     return findings, True
 
 
-def run_deterministic_checks(content: str) -> list[ReviewResultSchema]:
+def run_deterministic_checks(
+    content: str, sections: list[SectionSpec] = DEFAULT_SECTIONS
+) -> list[ReviewResultSchema]:
     findings: list[ReviewResultSchema] = []
+    required = required_titles(sections)
 
-    for section in missing_sections(content):
+    for section in missing_sections(content, required):
         findings.append(
             ReviewResultSchema(
                 severity="error", section=section, message=f"{section} is required"
@@ -127,12 +140,12 @@ def run_deterministic_checks(content: str) -> list[ReviewResultSchema]:
     by_name = {heading.lower(): (heading, body) for heading, body in section_bodies(content)}
 
     # Required sections that exist but have no content (heading present, body blank).
-    for required in ["Status", "Scope", "Decision"]:
-        entry = by_name.get(required.lower())
+    for title in required:
+        entry = by_name.get(title.lower())
         if entry and not entry[1].strip():
             findings.append(
                 ReviewResultSchema(
-                    severity="error", section=required, message=f"{required} has no content"
+                    severity="error", section=title, message=f"{title} has no content"
                 )
             )
 
@@ -159,19 +172,23 @@ def run_deterministic_checks(content: str) -> list[ReviewResultSchema]:
 
 
 async def review_adr(
-    content: str, check_types: list[str] = ["deterministic", "llm"]
+    content: str,
+    check_types: list[str] = ["deterministic", "llm"],
+    sections: list[SectionSpec] = DEFAULT_SECTIONS,
 ) -> ReviewResponseSchema:
     """
-    orchestrator function to run ADR checks, run both deterministic and llm checks by default
+    orchestrator function to run ADR checks, run both deterministic and llm checks by default.
+    `sections` is the ADR format both passes validate against; defaults to DEFAULT_SECTIONS
+    until per-KB format config is wired in, at which point the caller supplies its catalog.
     """
     results: list[ReviewResultSchema] = []
     llm_ok = True
 
     if "deterministic" in check_types:
-        results = run_deterministic_checks(content)
+        results = run_deterministic_checks(content, sections)
 
     if "llm" in check_types:
-        llm_findings, llm_ok = await run_llm_review(content)
+        llm_findings, llm_ok = await run_llm_review(content, sections)
         results = results + llm_findings
 
     return ReviewResponseSchema(findings=results, llm_ok=llm_ok)
