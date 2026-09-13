@@ -82,7 +82,7 @@
 		</ul>
 
 		<template #footer>
-			<Button :label="secondaryLabel" severity="secondary" text :disabled="loading" @click="visible = false" />
+			<Button label="Close" severity="secondary" text :disabled="loading" @click="visible = false" />
 			<Button :label="primaryLabel" :disabled="loading" @click="onSubmitAnyway">
 				<template #icon>
 					<Icon icon="mdi:check" class="mr-2 text-base" />
@@ -168,7 +168,6 @@ const badge = computed(() => {
 	return { wrap: "bg-amber-50 dark:bg-amber-950", fg: "text-amber-600 dark:text-amber-400", icon: "mdi:alert" };
 });
 
-const secondaryLabel = computed<string>(() => (props.error ? "Cancel" : props.findings.length ? "Fix issues" : "Close"));
 const primaryLabel = computed<string>(() => (props.error ? "Save anyway" : props.findings.length ? "Submit anyway" : "Submit"));
 
 const onSubmitAnyway = (): void => {
