@@ -63,11 +63,10 @@
 						<div
 							class="p-4 transition-colors"
 							:class="isActive('preamble') ? '' : 'cursor-text hover:bg-slate-50 dark:hover:bg-surface-800/40'"
-							@click="activate('preamble')"
+							data-card-content="preamble"
 						>
 							<MdEditor v-if="isActive('preamble')" v-model="doc.preamble" :preview="false" :theme="isDark ? 'dark' : 'light'" language="en-US" style="height: 220px" />
-							<!-- pointer-events-none so a click lands on the wrapper (which activates edit), not md-editor's own handlers -->
-							<MdPreview v-else :model-value="doc.preamble.trim() || '_No title or intro._'" :theme="isDark ? 'dark' : 'light'" language="en-US" class="pointer-events-none" />
+							<MdPreview v-else :model-value="doc.preamble.trim() || '_No title or intro._'" :theme="isDark ? 'dark' : 'light'" language="en-US" :auto-fold-threshold="100000" />
 							<p v-if="isActive('preamble')" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
 								Changing the <code># H1</code> title renames this record on save.
 							</p>
@@ -94,11 +93,10 @@
 						<div
 							class="p-4 transition-colors"
 							:class="isActive(index) ? '' : 'cursor-text hover:bg-slate-50 dark:hover:bg-surface-800/40'"
-							@click="activate(index)"
+							:data-card-content="index"
 						>
 							<MdEditor v-if="isActive(index)" v-model="section.body" :preview="false" :theme="isDark ? 'dark' : 'light'" language="en-US" style="height: 300px" />
-							<!-- pointer-events-none so a click lands on the wrapper (which activates edit), not md-editor's own handlers -->
-							<MdPreview v-else :model-value="sectionPreview(section)" :theme="isDark ? 'dark' : 'light'" language="en-US" class="pointer-events-none" />
+							<MdPreview v-else :model-value="sectionPreview(section)" :theme="isDark ? 'dark' : 'light'" language="en-US" :auto-fold-threshold="100000" />
 						</div>
 					</section>
 
@@ -188,6 +186,25 @@ const deactivate = (): void => {
 	activeCard.value = null;
 };
 
+// Which card's editable content a click landed in — or null if it landed on an interactive
+// region (code block, link, button) or outside a content area, where it must NOT enter edit.
+// The whole code block stays native: copy, fold toggle, horizontal scrollbar, text selection.
+const cardKeyFromClick = (event: MouseEvent): number | "preamble" | null => {
+	const target = event.target as HTMLElement;
+	if (target.closest(".md-editor-code, a, button")) return null;
+	const content = target.closest<HTMLElement>("[data-card-content]");
+	if (!content) return null;
+	const raw = content.dataset.cardContent ?? "";
+	return raw === "preamble" ? "preamble" : Number(raw);
+};
+
+// Click-to-edit. Listens in the capture phase at the document so it fires before md-editor's
+// own handlers (which otherwise swallow the click on rendered content).
+const onDocumentClickCapture = (event: MouseEvent): void => {
+	const key = cardKeyFromClick(event);
+	if (key !== null) activate(key);
+};
+
 // A press outside the active card commits its edit and closes it. Uses mousedown (not
 // click) so drag-selecting text and releasing outside the card doesn't close it — the
 // selection begins with a mousedown inside the card.
@@ -196,8 +213,15 @@ const onDocumentMouseDown = (event: MouseEvent): void => {
 	const el = activeCardElement();
 	if (el && !el.contains(event.target as Node)) activeCard.value = null;
 };
-onMounted(() => document.addEventListener("mousedown", onDocumentMouseDown));
-onBeforeUnmount(() => document.removeEventListener("mousedown", onDocumentMouseDown));
+
+onMounted(() => {
+	document.addEventListener("click", onDocumentClickCapture, true);
+	document.addEventListener("mousedown", onDocumentMouseDown);
+});
+onBeforeUnmount(() => {
+	document.removeEventListener("click", onDocumentClickCapture, true);
+	document.removeEventListener("mousedown", onDocumentMouseDown);
+});
 
 const checking = ref(false);
 const reviewDialogOpen = ref(false);
