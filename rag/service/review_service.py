@@ -80,21 +80,20 @@ a Scope of "rgrtg" — is NOT substantive; flag it with severity "warning".
 CORRECT / recommended actually FOLLOWS the stated Decision (e.g. Decision says "never throw" but a recommended \
 example throws). Severity "error".
 - OFF-TOPIC text that has nothing to do with the decision being recorded. Severity "warning".
-- BROKEN code snippets — code that is genuinely malformed (won't parse, e.g. unbalanced braces or invalid \
-tokens), written in the wrong language, or that contradicts the decision it illustrates. Severity "error".
+- CODE IN THE WRONG LANGUAGE — a snippet written in a different language than the ADR states or clearly \
+implies. Severity "warning".
 
 Calibration (avoid false positives):
 - Terse is fine when it's genuine and specific — a Decision of "Use PostgreSQL for the primary datastore" is \
 complete. Do NOT flag brevity or demand more detail when the meaning is clear.
-- Code snippets in ADRs are ILLUSTRATIVE excerpts, not complete compilable programs. Do NOT flag missing \
-imports, identifiers that are referenced but defined elsewhere (e.g. a helper, router, or variable from the \
-surrounding codebase), omitted boilerplate, or "..." placeholders. Judge only whether the snippet is well-formed \
-and demonstrates the decision — not whether it would compile standalone.
+- Code snippets are ILLUSTRATIVE excerpts, not runnable programs. Do NOT judge whether a snippet is complete, \
+valid, well-formed, or would compile/run — incompleteness (missing imports, identifiers defined elsewhere, \
+"..." placeholders) is expected and fine. Only consider whether it fits the decision and the language.
 - ADRs routinely include DELIBERATE anti-pattern examples labelled "INCORRECT", "don't do this", "bad", etc. — \
 that is intentional teaching content; do NOT flag it.
 - Do NOT flag missing sections, formatting, or length — those are checked separately.
-- Only flag content that is genuinely gibberish, filler, contradictory, off-topic, or broken. If a section is \
-real but imperfect, leave it.
+- Only flag content that is genuinely gibberish, filler, contradictory, or off-topic. If a section is real but \
+imperfect, leave it.
 
 For each problem, set an appropriate severity, name the section it belongs to (e.g. "Decision"), and give a \
 short specific message. If the ADR is sound, return an empty findings list."""
