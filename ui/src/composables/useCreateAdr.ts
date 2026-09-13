@@ -138,6 +138,8 @@ export function useCreateAdr() {
 	const reviewFindings = ref<ReviewFinding[]>([]);
 	const showReviewDialog = ref(false);
 	const hasReviewError = ref(false);
+	// The semantic (LLM) pass errored server-side (distinct from the whole call failing).
+	const reviewDegraded = ref(false);
 
 	const { validate, simpleValidate, validationErrors } = useZodValidation(adrSchema, {
 		errorToast: { summary: "Missing required fields", detail: "Please complete the highlighted fields." },
@@ -172,7 +174,9 @@ export function useCreateAdr() {
 		lines.push(f.id ? `# ${f.id}: ${title}` : `# ${title}`, "");
 		lines.push("## Status", f.status || "_Not set_", "");
 		lines.push("## Scope", f.scope || "_Not set_", "");
-		lines.push("## Context", f.context || "_Describe the situation and why a decision was needed._", "");
+		if (f.context.trim()) {
+			lines.push("## Context", f.context.trim(), "");
+		}
 		lines.push("## Decision", f.decision || "_State the decision clearly._");
 
 		if (f.alternatives.length) {
@@ -191,15 +195,14 @@ export function useCreateAdr() {
 			lines.push("", `## ${s.heading.trim() || "Untitled Section"}`, s.body.trim());
 		}
 
-		lines.push("", "## Consequences");
-		if (f.positiveConsequences.trim()) {
-			lines.push("", "### Positive", f.positiveConsequences.trim());
-		}
-		if (f.negativeConsequences.trim()) {
-			lines.push("", "### Trade-offs", f.negativeConsequences.trim());
-		}
-		if (!f.positiveConsequences.trim() && !f.negativeConsequences.trim()) {
-			lines.push("_What improves, and what gets harder as a result._");
+		if (f.positiveConsequences.trim() || f.negativeConsequences.trim()) {
+			lines.push("", "## Consequences");
+			if (f.positiveConsequences.trim()) {
+				lines.push("", "### Positive", f.positiveConsequences.trim());
+			}
+			if (f.negativeConsequences.trim()) {
+				lines.push("", "### Trade-offs", f.negativeConsequences.trim());
+			}
 		}
 		if (f.notes.trim()) {
 			lines.push("", "## Notes", f.notes.trim());
@@ -356,10 +359,12 @@ export function useCreateAdr() {
 	const checkQuality = async () => {
 		reviewFindings.value = [];
 		hasReviewError.value = false;
+		reviewDegraded.value = false;
 		checking.value = true;
 		try {
 			const result = await reviewService.reviewDocument(markdown.value);
 			reviewFindings.value = result.data.findings;
+			reviewDegraded.value = result.data.llm_ok === false;
 			showReviewDialog.value = true;
 		} catch (error) {
 			console.error(error);
@@ -377,7 +382,7 @@ export function useCreateAdr() {
 		submitting.value = true;
 		try {
 			await checkQuality();
-			if (hasReviewError.value || reviewFindings.value.length > 0) {
+			if (hasReviewError.value || reviewFindings.value.length > 0 || reviewDegraded.value) {
 				return;
 			}
 
@@ -466,6 +471,7 @@ export function useCreateAdr() {
 		reviewFindings,
 		showReviewDialog,
 		hasReviewError,
+		reviewDegraded,
 		checkQuality,
 		submitAnyway,
 	};
