@@ -113,7 +113,7 @@
 							<span class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-surface-400">Full preview</span>
 							<span class="ml-auto text-xs text-slate-400">{{ currentRecord }}.md</span>
 						</header>
-						<div class="preview-compact flex-1 min-h-0 overflow-y-auto">
+						<div class="preview-compact flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-surface-800/30">
 							<MdPreview :model-value="fullMarkdown" :theme="isDark ? 'dark' : 'light'" language="en-US" class="px-5 py-2" />
 						</div>
 					</div>

@@ -66,3 +66,9 @@ body {
 .preview-compact .md-editor-preview {
 	font-size: 14px;
 }
+
+/* md-editor paints its own white background (--md-bk-color); make it transparent so the
+   pane's subtle gray shows through. */
+.preview-compact .md-editor {
+	background-color: transparent;
+}
