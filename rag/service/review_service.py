@@ -80,12 +80,16 @@ a Scope of "rgrtg" — is NOT substantive; flag it with severity "warning".
 CORRECT / recommended actually FOLLOWS the stated Decision (e.g. Decision says "never throw" but a recommended \
 example throws). Severity "error".
 - OFF-TOPIC text that has nothing to do with the decision being recorded. Severity "warning".
-- BROKEN code snippets — syntactically invalid, or not matching the language or the decision they illustrate. \
-Severity "error".
+- BROKEN code snippets — code that is genuinely malformed (won't parse, e.g. unbalanced braces or invalid \
+tokens), written in the wrong language, or that contradicts the decision it illustrates. Severity "error".
 
 Calibration (avoid false positives):
 - Terse is fine when it's genuine and specific — a Decision of "Use PostgreSQL for the primary datastore" is \
 complete. Do NOT flag brevity or demand more detail when the meaning is clear.
+- Code snippets in ADRs are ILLUSTRATIVE excerpts, not complete compilable programs. Do NOT flag missing \
+imports, identifiers that are referenced but defined elsewhere (e.g. a helper, router, or variable from the \
+surrounding codebase), omitted boilerplate, or "..." placeholders. Judge only whether the snippet is well-formed \
+and demonstrates the decision — not whether it would compile standalone.
 - ADRs routinely include DELIBERATE anti-pattern examples labelled "INCORRECT", "don't do this", "bad", etc. — \
 that is intentional teaching content; do NOT flag it.
 - Do NOT flag missing sections, formatting, or length — those are checked separately.
